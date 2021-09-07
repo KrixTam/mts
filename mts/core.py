@@ -19,6 +19,7 @@ _SERVICE_CODE_BITS_SHIFT = _TIMESTAMP_BITS + _PID_CODE_BITS + _SEQUENCE_BITS
 _TIMESTAMP_BITS_SHIFT = _PID_CODE_BITS + _SEQUENCE_BITS
 _PID_CODE_BITS_SHIFT = _SEQUENCE_BITS
 
+_SERVICE_CODE_MASK = -1 ^ (-1 << _SERVICE_CODE_BITS)
 _TIMESTAMP_MASK = -1 ^ (-1 << _TIMESTAMP_BITS)
 _PID_CODE_MASK = -1 ^ (-1 << _PID_CODE_BITS)
 _SEQUENCE_MASK = -1 ^ (-1 << _SEQUENCE_BITS)
@@ -50,24 +51,30 @@ class ObjectId(object):
         return "{0:0{1}x}".format(self._id, 16)
 
     def __repr__(self):
+        service_code, ts, pid_code, sequence = ObjectId._unpack(self._id)
         now = moment()
-        ts = (self._id >> _TIMESTAMP_BITS_SHIFT) & _TIMESTAMP_MASK
-        print(str(ts))
-        print(str(ObjectId._last_ts))
         gap = (now.unix() - ObjectId._epoch) * 1000 + now.milliseconds() - ts
         content = "ObjectId('%s')\n" % (str(self),)
-        content = content + "Service Code: %s\n" % (str(ObjectId._service_code))
+        content = content + "Service Code: %s\n" % (str(service_code))
         content = content + "Timestamp: %s\n" % (now.subtract(gap, 'ms').format())
-        content = content + "PID Code: %s\n" % (str(ObjectId._pid_code))
-        content = content + "Sequence No.: %s\n" % (str(self._id & _SEQUENCE_MASK))
+        content = content + "PID Code: %s\n" % (str(pid_code))
+        content = content + "Sequence No.: %s\n" % (str(sequence))
         return content
 
     @staticmethod
     def register(settings):
         if 'epoch' in settings and isinstance(settings['epoch'], int):
-            ObjectId._epoch = settings['epoch']
+            ObjectId._epoch = settings['epoch'] & _TIMESTAMP_MASK
         if 'service_code' in settings and isinstance(settings['service_code'], int):
-            ObjectId._service_code = settings['service_code']
+            ObjectId._service_code = settings['service_code'] & _SERVICE_CODE_MASK
+
+    @classmethod
+    def _unpack(cls, oid):
+        service_code = oid >> _SERVICE_CODE_BITS_SHIFT
+        last_ts = (oid >> _TIMESTAMP_BITS_SHIFT) & _TIMESTAMP_MASK
+        pid_code = (oid >> _TIMESTAMP_BITS_SHIFT) & _PID_CODE_MASK
+        sequence = oid & _SEQUENCE_MASK
+        return service_code, last_ts, pid_code, sequence
 
     @classmethod
     def _generate_pid_code(cls):
@@ -102,11 +109,8 @@ class ObjectId(object):
     def _validate(self, oid):
         oid_value = int(oid, 16)
         try:
-            ObjectId._service_code = oid_value >> _SERVICE_CODE_BITS_SHIFT
-            ObjectId._last_ts = (oid_value >> _TIMESTAMP_BITS_SHIFT) & _TIMESTAMP_MASK
             ObjectId._pid = getpid()
-            ObjectId._pid_code = (oid_value >> _TIMESTAMP_BITS_SHIFT) & _PID_CODE_MASK
-            ObjectId._sequence = oid_value & _SEQUENCE_MASK
+            ObjectId._service_code, ObjectId._last_ts, ObjectId._pid_code, ObjectId._sequence = ObjectId._unpack(oid_value)
             self._id = oid_value
         except ValueError:
             print('id is invalid. Program will generate a new Object ID.')

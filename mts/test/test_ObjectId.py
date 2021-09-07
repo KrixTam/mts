@@ -15,6 +15,17 @@ class TestObjectId(unittest.TestCase):
         b = ObjectId()
         self.assertTrue(a < b)
 
+    def test_register(self):
+        a = ObjectId()
+        ObjectId.register({'service_code': 4})
+        c = ObjectId()
+        self.assertNotEqual(a.__repr__().split('\n')[1], c.__repr__().split('\n')[1])
+        b = ObjectId(a)
+        print(a.__repr__())
+        print(b.__repr__())
+        print(c.__repr__())
+        self.assertTrue(a == b)
+
 
 if __name__ == '__main__':
     unittest.main()
