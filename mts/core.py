@@ -24,6 +24,13 @@ _TIMESTAMP_MASK = -1 ^ (-1 << _TIMESTAMP_BITS)
 _PID_CODE_MASK = -1 ^ (-1 << _PID_CODE_BITS)
 _SEQUENCE_MASK = -1 ^ (-1 << _SEQUENCE_BITS)
 
+_DD_TYPE_BITS = 4
+_OID_BITS = 64
+
+_DD_TYPE_BITS_SHIFT = _OID_BITS
+
+_DD_TYPE_MASK = -1 ^ (-1 << _DD_TYPE_BITS)
+_OID_MASK = -1 ^ (-1 << _OID_BITS)
 
 class ObjectId(object):
     _pid = getpid()
@@ -74,6 +81,8 @@ class ObjectId(object):
         last_ts = (oid >> _TIMESTAMP_BITS_SHIFT) & _TIMESTAMP_MASK
         pid_code = (oid >> _TIMESTAMP_BITS_SHIFT) & _PID_CODE_MASK
         sequence = oid & _SEQUENCE_MASK
+        if last_ts <= 0:
+            raise ValueError('Invalid id. Time is moving backwards.')
         return service_code, last_ts, pid_code, sequence
 
     @classmethod
@@ -100,21 +109,43 @@ class ObjectId(object):
                 else:
                     ObjectId._sequence = 0
                 ObjectId._last_ts = ts
-            new_id = (ObjectId._service_code << _SERVICE_CODE_BITS_SHIFT) | (ts << _TIMESTAMP_BITS_SHIFT) | (
-                    pid_code << _PID_CODE_BITS_SHIFT) | sequence
+            new_id = (ObjectId._service_code << _SERVICE_CODE_BITS_SHIFT) | (ts << _TIMESTAMP_BITS_SHIFT) | (pid_code << _PID_CODE_BITS_SHIFT) | sequence
             self._id = new_id
         else:
             self._validate(oid)
 
     def _validate(self, oid):
-        oid_value = int(oid, 16)
-        try:
-            ObjectId._pid = getpid()
-            ObjectId._service_code, ObjectId._last_ts, ObjectId._pid_code, ObjectId._sequence = ObjectId._unpack(oid_value)
-            self._id = oid_value
-        except ValueError:
+        if len(oid) == 16:
+            try:
+                oid_value = int(oid, 16)
+                ObjectId._pid = getpid()
+                ObjectId._service_code, ObjectId._last_ts, ObjectId._pid_code, ObjectId._sequence = ObjectId._unpack(oid_value)
+                self._id = oid_value
+            except ValueError:
+                print('id is invalid. Program will generate a new Object ID.')
+                self._generate()
+        else:
             print('id is invalid. Program will generate a new Object ID.')
             self._generate()
+
+    @staticmethod
+    def validate(oid):
+        if isinstance(oid, int):
+            try:
+                ObjectId._unpack(oid)
+                return True
+            except ValueError:
+                return False
+        else:
+            if isinstance(oid, str) and len(oid) == 16:
+                try:
+                    oid_value = int(oid, 16)
+                    ObjectId._unpack(oid_value)
+                    return True
+                except ValueError:
+                    return False
+            else:
+                return False
 
     @property
     def value(self):
@@ -149,6 +180,64 @@ class ObjectId(object):
         if isinstance(other, ObjectId):
             return self._id >= other.value
         return NotImplemented
+
+
+class DataDictionaryId(object):
+    __slots__ = ('_id',)
+
+    def __init__(self, **kwargs):
+        if 'ddid' in kwargs:
+            ddid = kwargs['ddid']
+            if isinstance(ddid, DataDictionaryId):
+                self._generate(ddid)
+            else:
+                if isinstance(ddid, str):
+                    self._generate(ddid)
+                else:
+                    raise TypeError("ddid must be an instance of (str, DataDictionaryId), not %s" % (type(ddid),))
+        else:
+            if 'oid' in kwargs and 'dd_type' in kwargs:
+                self._id = DataDictionaryId.pack(kwargs['dd_type'], kwargs['oid'])
+            else:
+                raise ValueError('Invalid parameters for DataDictionaryId.')
+
+    def _generate(self, ddid):
+        dd_type, oid = DataDictionaryId.unpack(ddid)
+        self._id = DataDictionaryId.pack(dd_type, oid)
+
+    @staticmethod
+    def unpack(ddid):
+        ddid_value = ddid
+        if isinstance(ddid, int):
+            pass
+        else:
+            if isinstance(ddid, str) and len(ddid) == 17:
+                ddid_value = int(ddid, 16)
+            else:
+                raise TypeError("ddid must be an instance of str, which contains 17 characters, or an instance of DataDictionaryId.")
+        dd_type = ddid_value >> _DD_TYPE_BITS_SHIFT
+        oid = ddid_value & _OID_MASK
+        if ObjectId.validate(oid) and dd_type > 0:
+            return dd_type, oid
+        else:
+            raise ValueError('Invalid ddid as including invalid ObjectId.')
+
+    @staticmethod
+    def pack(dd_type: int, oid: int):
+        ddid = (dd_type << _DD_TYPE_BITS_SHIFT) | oid
+        return ddid
+
+    @property
+    def value(self):
+        return self._id
+
+    @property
+    def dd_type(self):
+        return self._id >> _DD_TYPE_BITS_SHIFT
+
+    @property
+    def oid(self):
+        return self._id & _OID_MASK
 
 
 class DataUnitProcessor(object):
@@ -231,25 +320,32 @@ class DataUnitService(object):
         self._tdu = TimeDataUnit(settings['tdu'])
         self._sdu = SpaceDataUnit(settings['sdu'])
 
+    @property
     def service_id(self):
         return self._config['service_id']
 
+    @property
     def owners(self):
         return self._tdu.owners()
 
+    @property
     def metrics(self):
         return self._tdu.metrics()
 
+    @property
     def ds_path(self):
         return self._config['ds_path']
 
     def init_tables(self, cursor):
         # 初始化SDU数据表
-        sdu_table_name = self.service_id() + '_sdu'
-        cursor.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + sdu_table_name + "'")
+        sdu_table_name = self.service_id + '_sdu'
+        sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + sdu_table_name + "'"
+        cursor.execute(sql)
         if cursor.fetchone()[0] == 1:
-            cursor.execute("DROP TABLE " + sdu_table_name)
-        cursor.execute()
+            sql = "DROP TABLE " + sdu_table_name
+            cursor.execute(sql)
+        sql = "CREATE TABLE IF NOT EXISTS " + sdu_table_name + "([owner_id] VARCHAR(16), [tag] VARCHAR(16), [value] VARCHAR(16))"
+        cursor.execute(sql)
 
     def import_data(self):
         sdu_data_filename = path.join(self.ds_path(), self.service_id() + '.sdu')
