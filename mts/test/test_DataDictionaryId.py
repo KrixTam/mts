@@ -10,6 +10,8 @@ class TestDataDictionaryId(unittest.TestCase):
         b = DataDictionaryId(dd_type=1, oid=int('000548d4e5abb002', 16))
         self.assertEqual(b.oid, int('000548d4e5abb002', 16))
         self.assertEqual(b.dd_type, 1)
+        print(a.__repr__())
+        print(b.__repr__())
 
     def test_TypeError(self):
         try:

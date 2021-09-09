@@ -32,6 +32,7 @@ _DD_TYPE_BITS_SHIFT = _OID_BITS
 _DD_TYPE_MASK = -1 ^ (-1 << _DD_TYPE_BITS)
 _OID_MASK = -1 ^ (-1 << _OID_BITS)
 
+
 class ObjectId(object):
     _pid = getpid()
     _lock = threading.Lock()
@@ -201,6 +202,17 @@ class DataDictionaryId(object):
             else:
                 raise ValueError('Invalid parameters for DataDictionaryId.')
 
+    def __str__(self):
+        return "{0:0{1}x}".format(self._id, 16)
+
+    def __repr__(self):
+        dd_type, oid = DataDictionaryId.unpack(self._id)
+        content = "DataDictionaryId('%s')\n" % (str(self),)
+        content = content + "Data Dictionary Type: %s\n" % (dd_type,)
+        oid_str = "{0:0{1}x}".format(oid, 16)
+        content = content + "ObjectId: %s\n" % (oid_str,)
+        return content
+
     def _generate(self, ddid):
         dd_type, oid = DataDictionaryId.unpack(ddid)
         self._id = DataDictionaryId.pack(dd_type, oid)
@@ -238,6 +250,36 @@ class DataDictionaryId(object):
     @property
     def oid(self):
         return self._id & _OID_MASK
+
+    def __eq__(self, other):
+        if isinstance(other, DataDictionaryId):
+            return self._id == other.value
+        return NotImplemented
+
+    def __ne__(self, other):
+        if isinstance(other, DataDictionaryId):
+            return self._id != other.value
+        return NotImplemented
+
+    def __lt__(self, other):
+        if isinstance(other, DataDictionaryId):
+            return self._id < other.value
+        return NotImplemented
+
+    def __le__(self, other):
+        if isinstance(other, DataDictionaryId):
+            return self._id <= other.value
+        return NotImplemented
+
+    def __gt__(self, other):
+        if isinstance(other, DataDictionaryId):
+            return self._id > other.value
+        return NotImplemented
+
+    def __ge__(self, other):
+        if isinstance(other, DataDictionaryId):
+            return self._id >= other.value
+        return NotImplemented
 
 
 class DataUnitProcessor(object):
@@ -294,7 +336,7 @@ class DataUnitService(object):
         self._config = config({
             'name': 'DataUnitService',
             'default': {
-                'service_id': 'service_id',
+                'service_id': '00',
                 'version': 0,
                 'ds_path': 'ds',
                 'tdu': {},
@@ -303,7 +345,10 @@ class DataUnitService(object):
             'schema': {
                 'type': 'object',
                 'properties': {
-                    'service_id': {'type': 'string'},
+                    'service_id': {
+                        'type': 'string',
+                        'pattern': '[0-7]{2}'
+                    },
                     'version': {
                         'type': 'integer',
                         'minimum': 0
@@ -323,6 +368,10 @@ class DataUnitService(object):
     @property
     def service_id(self):
         return self._config['service_id']
+
+    @property
+    def service_code(self):
+        return int(self.service_id, 8)
 
     @property
     def owners(self):
