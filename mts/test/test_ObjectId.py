@@ -19,11 +19,14 @@ class TestObjectId(unittest.TestCase):
         a = ObjectId()
         ObjectId.register({'service_code': 4})
         c = ObjectId()
+        d = ObjectId(service_code=0)
         self.assertNotEqual(a.__repr__().split('\n')[1], c.__repr__().split('\n')[1])
+        self.assertEqual(a.__repr__().split('\n')[1], d.__repr__().split('\n')[1])
         b = ObjectId(a)
         print(a.__repr__())
         print(b.__repr__())
         print(c.__repr__())
+        print(d.__repr__())
         self.assertTrue(a == b)
 
 

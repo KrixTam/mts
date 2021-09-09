@@ -41,9 +41,14 @@ class ObjectId(object):
     _pid_code = getrandbits(4)
     _last_ts = None
     _sequence = 0
-    __slots__ = ('_id',)
+    __slots__ = ('_id', '_sc',)
 
-    def __init__(self, oid=None):
+    def __init__(self, oid=None, service_code: int = None):
+        self._sc = None
+        if service_code is None:
+            self._sc = ObjectId._service_code
+        else:
+            self._sc = service_code
         if oid is None:
             self._generate()
         else:
@@ -59,7 +64,7 @@ class ObjectId(object):
         return "{0:0{1}x}".format(self._id, 16)
 
     def __repr__(self):
-        service_code, ts, pid_code, sequence = ObjectId._unpack(self._id)
+        service_code, ts, pid_code, sequence = ObjectId.unpack(self._id)
         now = moment()
         gap = (now.unix() - ObjectId._epoch) * 1000 + now.milliseconds() - ts
         content = "ObjectId('%s')\n" % (str(self),)
@@ -76,8 +81,8 @@ class ObjectId(object):
         if 'service_code' in settings and isinstance(settings['service_code'], int):
             ObjectId._service_code = settings['service_code'] & _SERVICE_CODE_MASK
 
-    @classmethod
-    def _unpack(cls, oid):
+    @staticmethod
+    def unpack(oid):
         service_code = oid >> _SERVICE_CODE_BITS_SHIFT
         last_ts = (oid >> _TIMESTAMP_BITS_SHIFT) & _TIMESTAMP_MASK
         pid_code = (oid >> _TIMESTAMP_BITS_SHIFT) & _PID_CODE_MASK
@@ -110,7 +115,7 @@ class ObjectId(object):
                 else:
                     ObjectId._sequence = 0
                 ObjectId._last_ts = ts
-            new_id = (ObjectId._service_code << _SERVICE_CODE_BITS_SHIFT) | (ts << _TIMESTAMP_BITS_SHIFT) | (pid_code << _PID_CODE_BITS_SHIFT) | sequence
+            new_id = (self._sc << _SERVICE_CODE_BITS_SHIFT) | (ts << _TIMESTAMP_BITS_SHIFT) | (pid_code << _PID_CODE_BITS_SHIFT) | sequence
             self._id = new_id
         else:
             self._validate(oid)
@@ -120,8 +125,9 @@ class ObjectId(object):
             try:
                 oid_value = int(oid, 16)
                 ObjectId._pid = getpid()
-                ObjectId._service_code, ObjectId._last_ts, ObjectId._pid_code, ObjectId._sequence = ObjectId._unpack(oid_value)
+                ObjectId._service_code, ObjectId._last_ts, ObjectId._pid_code, ObjectId._sequence = ObjectId.unpack(oid_value)
                 self._id = oid_value
+                self._sc = ObjectId._service_code
             except ValueError:
                 print('id is invalid. Program will generate a new Object ID.')
                 self._generate()
@@ -133,7 +139,7 @@ class ObjectId(object):
     def validate(oid):
         if isinstance(oid, int):
             try:
-                ObjectId._unpack(oid)
+                ObjectId.unpack(oid)
                 return True
             except ValueError:
                 return False
@@ -141,7 +147,7 @@ class ObjectId(object):
             if isinstance(oid, str) and len(oid) == 16:
                 try:
                     oid_value = int(oid, 16)
-                    ObjectId._unpack(oid_value)
+                    ObjectId.unpack(oid_value)
                     return True
                 except ValueError:
                     return False
