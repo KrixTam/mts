@@ -5,7 +5,6 @@ from os import path, getpid
 from config import config
 import connectorx as cx
 import threading
-from abc import ABCMeta, abstractmethod
 import logging
 from moment import moment
 from random import getrandbits
@@ -31,6 +30,13 @@ _DD_TYPE_BITS_SHIFT = _OID_BITS
 
 _DD_TYPE_MASK = -1 ^ (-1 << _DD_TYPE_BITS)
 _OID_MASK = -1 ^ (-1 << _OID_BITS)
+
+_DD_TYPE = {
+    'owner': 1,
+    'metric': 2,
+    'tag': 3,
+    'tag_value': 4
+}
 
 
 class ObjectId(object):
@@ -209,7 +215,7 @@ class DataDictionaryId(object):
                 raise ValueError('Invalid parameters for DataDictionaryId.')
 
     def __str__(self):
-        return "{0:0{1}x}".format(self._id, 16)
+        return "{0:0{1}x}".format(self._id, 17)
 
     def __repr__(self):
         dd_type, oid = DataDictionaryId.unpack(self._id)
@@ -235,10 +241,10 @@ class DataDictionaryId(object):
                 raise TypeError("ddid must be an instance of str, which contains 17 characters, or an instance of DataDictionaryId.")
         dd_type = ddid_value >> _DD_TYPE_BITS_SHIFT
         oid = ddid_value & _OID_MASK
-        if ObjectId.validate(oid) and dd_type > 0:
+        if ObjectId.validate(oid) and dd_type in _DD_TYPE.values():
             return dd_type, oid
         else:
-            raise ValueError('Invalid ddid as including invalid ObjectId.')
+            raise ValueError('Invalid ddid.')
 
     @staticmethod
     def pack(dd_type: int, oid: int):
@@ -309,28 +315,24 @@ class DataUnitProcessor(object):
 
     def add_ds(self, ds):
         if isinstance(ds, DataUnitService):
-            self._ds[ds.service_id()] = ds
+            self._ds[ds.service_id] = ds
         else:
             if isinstance(ds, dict):
                 ds_object = DataUnitService(ds)
-                self._ds[ds_object.service_id()] = ds_object
+                self._ds[ds_object.service_id] = ds_object
             else:
-                raise TypeError('参数ds的类型应该为DataService或者dict')
+                raise TypeError("ds must be an instance of (DataService, dict), not %s" % (type(ds),))
 
+    @property
     def db_path(self):
         return self._config['db'].split('://')[1]
-
-    def init_table(self, service_id, cursor):
-        if service_id in self._ds:
-            ds = self._ds[service_id]
-        else:
-            logging.warning('不存在数据单元服务：[' + service_id + ']，未能进行初始化处理')
 
     def init_service(self, service_id):
         if service_id in self._ds:
             ds = self._ds[service_id]
             conn = sqlite3.connect(self.db_path())
             c = conn.cursor()
+            ds.init_tables(c)
             # 初始化SDU数据
             sdu_data_filename = path.join(ds.ds_path(), service_id + '.sdu')
         else:
@@ -338,16 +340,30 @@ class DataUnitProcessor(object):
 
 
 class DataUnitService(object):
-    def __init__(self, settings):
+    _processor = None
+
+    def __init__(self, settings, processor=None):
         self._config = config({
             'name': 'DataUnitService',
             'default': {
                 'service_id': '00',
                 'version': 0,
                 'ds_path': 'ds',
-                'tdu': {},
-                'sdu': {}
-            },
+                'owners': ['owner_01'],
+                'metrics': ['metric_01'],
+                'tags': [
+                    {
+                        'name': 'xxx',
+                        'values': [
+                            {
+                                'value': 'xxx',
+                                'owners': []
+                            }
+                        ]
+                    }
+                ]
+
+        },
             'schema': {
                 'type': 'object',
                 'properties': {
@@ -360,16 +376,50 @@ class DataUnitService(object):
                         'minimum': 0
                     },
                     'ds_path': {'type': 'string'},
-                    'tdu': {'type': 'object'},
-                    'sdu': {'type': 'object'}
+                    'owners': {
+                        'type': 'array',
+                        'items': {'type': 'string'},
+                        'minItems': 1
+                    },
+                    'metrics': {
+                        'type': 'array',
+                        'items': {'type': 'string'},
+                        'minItems': 1
+                    },
+                    'tag': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'value': {
+                                    'type': 'array',
+                                    'items': {
+                                        'type': 'object',
+                                        'properties': {
+                                            'name': {'type': 'string'},
+                                            'owners': {
+                                                'type': 'array',
+                                                'items': {'type': 'string'}
+                                            }
+                                        }
+                                    },
+                                    'minItems': 1
+                                }
+                            }
+                        },
+                        'minItems': 1
+                    }
                 }
             }
         })
         for key, value in settings.items():
             if key in self._config:
                 self._config[key] = value
-        self._tdu = TimeDataUnit(settings['tdu'])
-        self._sdu = SpaceDataUnit(settings['sdu'])
+        if processor is not None:
+            self.set_processor(processor)
+        # self._tdu = TimeDataUnit(settings['tdu'])
+        # self._sdu = SpaceDataUnit(settings['sdu'])
 
     @property
     def service_id(self):
@@ -391,107 +441,77 @@ class DataUnitService(object):
     def ds_path(self):
         return self._config['ds_path']
 
-    def init_tables(self, cursor):
-        # 初始化SDU数据表
-        sdu_table_name = self.service_id + '_sdu'
-        sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + sdu_table_name + "'"
+    @staticmethod
+    def drop_table(cursor, table_name: str):
+        sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + table_name + "'"
         cursor.execute(sql)
         if cursor.fetchone()[0] == 1:
-            sql = "DROP TABLE " + sdu_table_name
+            sql = "DROP TABLE " + table_name
             cursor.execute(sql)
-        sql = "CREATE TABLE IF NOT EXISTS " + sdu_table_name + "([owner_id] VARCHAR(16), [tag] VARCHAR(16), [value] VARCHAR(16))"
+
+    @staticmethod
+    def create_table(cursor, **kwargs):
+        table_name = kwargs['table_name']
+        fields = []
+        for key, value in kwargs['fields'].items():
+            fields.append('[' + key + '] ' + value)
+        sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields) + ")"
+        print(sql)
         cursor.execute(sql)
+
+    def init_dd(self, cursor):
+        service_id = self.service_id
+
+    @classmethod
+    def set_processor(cls, processor):
+        cls._processor = processor
+
+    def init_tables(self, cursor):
+        # 建立DD数据表
+        dd_table_name = self.service_id + '_dd'
+        DataUnitService.drop_table(cursor, dd_table_name)
+        table_definition = {
+            'table_name': dd_table_name,
+            'fields': {
+                'ddid': 'VARCHAR(16)',
+                'disc': 'VARCHAR(160)'
+            }
+        }
+        DataUnitService.create_table(cursor, **table_definition)
+        # 建立SDU数据表
+        sdu_table_name = self.service_id + '_sdu'
+        DataUnitService.drop_table(cursor, sdu_table_name)
+        table_definition = {
+            'table_name': sdu_table_name,
+            'fields': {
+                'owner': 'VARCHAR(16)',
+                'tag': 'INT'
+            }
+        }
+        DataUnitService.create_table(cursor, **table_definition)
+        # 建立TDU数据表
+        # TODO
 
     def import_data(self):
         sdu_data_filename = path.join(self.ds_path(), self.service_id() + '.sdu')
 
 
-class DataUnit(metaclass=ABCMeta):
-    __slots__ = ('_config',)
+class DataUnit():
+    __slots__ = ('_db_url',)
 
-    def __init__(self, settings):
-        self._config = None
-        self.init_config()
-        self.set_config(settings)
+    def __init__(self, db_url):
+        self._db_url = db_url
 
-    @abstractmethod
-    def init_config(self):
-        pass
-
-    def set_config(self, settings):
-        for key, value in settings.items():
-            if key in self._config:
-                self._config[key] = value
+    def query(self, sql):
+        return cx.read_sql(self._db_url['db'], sql)
 
 
 class TimeDataUnit(DataUnit):
-    def __init__(self, settings):
-        super().__init__(settings)
-
-    def init_config(self):
-        self._config = config({
-            'name': 'TimeDataUnit',
-            'default': {
-                'owners': ['owner_01'],
-                'metrics': ['metric_01']
-            },
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'owners': {
-                        'type': 'array',
-                        'items': {'type': 'string'},
-                        'minItems': 1
-                    },
-                    'metrics': {
-                        'type': 'array',
-                        'items': {'type': 'string'},
-                        'minItems': 1
-                    }
-                }
-            }
-        })
-
-    def owners(self):
-        return self._config['owners']
-
-    def metrics(self):
-        return self._config['metrics']
+    def __init__(self, db_url):
+        super().__init__(db_url)
 
 
 class SpaceDataUnit(DataUnit):
-    def __init__(self, settings):
-        super().__init__(settings)
+    def __init__(self, db_url):
+        super().__init__(db_url)
 
-    def init_config(self):
-        self._config = config({
-            'name': 'SpaceDataUnit',
-            'default': {
-                'tags': [
-                    {
-                        'name': 'tag_name',
-                        'values': ['tag_value_01']
-                    }
-                ]
-            },
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'tag': {
-                        'type': 'array',
-                        'items': {
-                            'type': 'object',
-                            'properties': {
-                                'name': {'type': 'string'},
-                                'value': {
-                                    'type': 'array',
-                                    'items': {'type': 'string'},
-                                    'minItems': 1
-                                }
-                            }
-                        },
-                        'minItems': 1
-                    }
-                }
-            }
-        })
