@@ -311,6 +311,8 @@ class DataUnitProcessor(object):
         for key, value in settings.items():
             if key in self._config:
                 self._config[key] = value
+        assert not self._config.is_default('db')
+        DBConnector.register(self._config['db'])
         self._ds = {}
 
     def add_ds(self, ds):
@@ -323,16 +325,10 @@ class DataUnitProcessor(object):
             else:
                 raise TypeError("ds must be an instance of (DataService, dict), not %s" % (type(ds),))
 
-    @property
-    def db_path(self):
-        return self._config['db'].split('://')[1]
-
     def init_service(self, service_id):
         if service_id in self._ds:
             ds = self._ds[service_id]
-            conn = sqlite3.connect(self.db_path())
-            c = conn.cursor()
-            ds.init_tables(c)
+            # ds.init_tables(c)
             # 初始化SDU数据
             sdu_data_filename = path.join(ds.ds_path(), service_id + '.sdu')
         else:
@@ -340,9 +336,7 @@ class DataUnitProcessor(object):
 
 
 class DataUnitService(object):
-    _processor = None
-
-    def __init__(self, settings, processor=None):
+    def __init__(self, settings):
         self._config = config({
             'name': 'DataUnitService',
             'default': {
@@ -416,8 +410,6 @@ class DataUnitService(object):
         for key, value in settings.items():
             if key in self._config:
                 self._config[key] = value
-        if processor is not None:
-            self.set_processor(processor)
         # self._tdu = TimeDataUnit(settings['tdu'])
         # self._sdu = SpaceDataUnit(settings['sdu'])
 
@@ -437,34 +429,8 @@ class DataUnitService(object):
     def metrics(self):
         return self._tdu.metrics()
 
-    @property
-    def ds_path(self):
-        return self._config['ds_path']
-
-    @staticmethod
-    def drop_table(cursor, table_name: str):
-        sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + table_name + "'"
-        cursor.execute(sql)
-        if cursor.fetchone()[0] == 1:
-            sql = "DROP TABLE " + table_name
-            cursor.execute(sql)
-
-    @staticmethod
-    def create_table(cursor, **kwargs):
-        table_name = kwargs['table_name']
-        fields = []
-        for key, value in kwargs['fields'].items():
-            fields.append('[' + key + '] ' + value)
-        sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields) + ")"
-        print(sql)
-        cursor.execute(sql)
-
     def init_dd(self, cursor):
         service_id = self.service_id
-
-    @classmethod
-    def set_processor(cls, processor):
-        cls._processor = processor
 
     def init_tables(self, cursor):
         # 建立DD数据表
@@ -496,22 +462,53 @@ class DataUnitService(object):
         sdu_data_filename = path.join(self.ds_path(), self.service_id() + '.sdu')
 
 
-class DataUnit():
-    __slots__ = ('_db_url',)
+class DBConnector(object):
+    _db_url = None
 
-    def __init__(self, db_url):
-        self._db_url = db_url
+    def __init__(self):
+        pass
 
-    def query(self, sql):
-        return cx.read_sql(self._db_url['db'], sql)
+    @staticmethod
+    def register(db_url):
+        DBConnector._db_url = db_url
+
+    @staticmethod
+    def query(table_name, fields=None, condition=None):
+        sql = ''
+        return cx.read_sql(DBConnector._db_url, sql)
+
+    @staticmethod
+    def init_table(table_name, fields):
+        if DBConnector._db_url is None:
+            raise ValueError('Please register db_url to DBConnector first.')
+        else:
+            db_path = DBConnector._db_url.split('://')[1]
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            # 如果存在table，先drop掉
+            sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + table_name + "'"
+            cursor.execute(sql)
+            if cursor.fetchone()[0] == 1:
+                sql = "DROP TABLE " + table_name
+                cursor.execute(sql)
+            # 创建table
+            for key, value in fields.items():
+                fields.append('[' + key + '] ' + value)
+            sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields) + ")"
+            print(sql)
+            cursor.execute(sql)
+
+
+class DataUnit(object):
+    pass
 
 
 class TimeDataUnit(DataUnit):
-    def __init__(self, db_url):
-        super().__init__(db_url)
+    def __init__(self, owners, metrics):
+        super().__init__()
 
 
 class SpaceDataUnit(DataUnit):
-    def __init__(self, db_url):
-        super().__init__(db_url)
+    def __init__(self, tag):
+        super().__init__()
 
