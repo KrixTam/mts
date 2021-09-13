@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import csv
 import sqlite3
 from os import path, getpid
 from config import config
@@ -357,7 +358,7 @@ class DataUnitService(object):
                     }
                 ]
 
-        },
+            },
             'schema': {
                 'type': 'object',
                 'properties': {
@@ -432,34 +433,35 @@ class DataUnitService(object):
     def init_dd(self, cursor):
         service_id = self.service_id
 
-    def init_tables(self, cursor):
+    def init_tables(self):
         # 建立DD数据表
         dd_table_name = self.service_id + '_dd'
-        DataUnitService.drop_table(cursor, dd_table_name)
-        table_definition = {
-            'table_name': dd_table_name,
-            'fields': {
-                'ddid': 'VARCHAR(16)',
-                'disc': 'VARCHAR(160)'
-            }
-        }
-        DataUnitService.create_table(cursor, **table_definition)
+        DBConnector.init_table(dd_table_name, {'ddid': 'VARCHAR(16)', 'disc': 'VARCHAR(160)'})
+        # 初始化ddid
+        ddid_content = []
+        for owner in self.owners:
+            # TODO
+            pass
         # 建立SDU数据表
         sdu_table_name = self.service_id + '_sdu'
-        DataUnitService.drop_table(cursor, sdu_table_name)
-        table_definition = {
-            'table_name': sdu_table_name,
-            'fields': {
-                'owner': 'VARCHAR(16)',
-                'tag': 'INT'
-            }
-        }
-        DataUnitService.create_table(cursor, **table_definition)
+        DBConnector.init_table(sdu_table_name, {'owner': 'VARCHAR(16)', 'tag': 'INT'})
         # 建立TDU数据表
-        # TODO
+        # tdu_table_name =
 
     def import_data(self):
         sdu_data_filename = path.join(self.ds_path(), self.service_id() + '.sdu')
+
+    def export_data(self, output_filename):
+        pass
+
+    @staticmethod
+    def write_file(output_filename, headers, content):
+        with open(output_filename, 'w', newline='') as file_handler:
+            wr = csv.writer(file_handler)
+            if len(headers) > 0:
+                wr.writerow(headers)
+            for line in content:
+                wr.writerow(line)
 
 
 class DBConnector(object):
@@ -473,8 +475,14 @@ class DBConnector(object):
         DBConnector._db_url = db_url
 
     @staticmethod
-    def query(table_name, fields=None, condition=None):
-        sql = ''
+    def query(table_name, fields: list = None, condition: str = None):
+        sql = 'SELECT '
+        if fields is None:
+            sql = sql + '* from ' + table_name
+        else:
+            sql = sql + ', '.join(fields) + table_name
+        if condition is not None:
+            sql = sql + 'WHERE ' + condition
         return cx.read_sql(DBConnector._db_url, sql)
 
     @staticmethod
