@@ -213,7 +213,11 @@ class DataDictionaryId(object):
             if 'oid' in kwargs and 'dd_type' in kwargs:
                 self._id = DataDictionaryId.pack(kwargs['dd_type'], kwargs['oid'])
             else:
-                raise ValueError('Invalid parameters for DataDictionaryId.')
+                if 'dd_type' in kwargs and 'service_code' in kwargs:
+                    oid = ObjectId(service_code=kwargs['service_code'])
+                    self._id = DataDictionaryId.pack(kwargs['dd_type'], oid.value)
+                else:
+                    raise ValueError('Invalid parameters for DataDictionaryId.')
 
     def __str__(self):
         return "{0:0{1}x}".format(self._id, 17)
@@ -351,7 +355,7 @@ class DataUnitService(object):
                         'name': 'xxx',
                         'values': [
                             {
-                                'value': 'xxx',
+                                'disc': 'xxx',
                                 'owners': []
                             }
                         ]
@@ -387,12 +391,12 @@ class DataUnitService(object):
                             'type': 'object',
                             'properties': {
                                 'name': {'type': 'string'},
-                                'value': {
+                                'values': {
                                     'type': 'array',
                                     'items': {
                                         'type': 'object',
                                         'properties': {
-                                            'name': {'type': 'string'},
+                                            'disc': {'type': 'string'},
                                             'owners': {
                                                 'type': 'array',
                                                 'items': {'type': 'string'}
@@ -430,6 +434,11 @@ class DataUnitService(object):
     def metrics(self):
         return self._tdu.metrics()
 
+    @property
+    def tags(self):
+        # TODO
+        pass
+
     def init_dd(self, cursor):
         service_id = self.service_id
 
@@ -439,9 +448,18 @@ class DataUnitService(object):
         DBConnector.init_table(dd_table_name, {'ddid': 'VARCHAR(16)', 'disc': 'VARCHAR(160)'})
         # 初始化ddid
         ddid_content = []
-        for owner in self.owners:
-            # TODO
-            pass
+        for owner in self._config['owners']:
+            line = str(DataDictionaryId(dd_type=_DD_TYPE['owner'], service_code=self.service_code)) + ', ' + owner
+            ddid_content.append(line)
+        for metric in self._config['metrics']:
+            line = str(DataDictionaryId(dd_type=_DD_TYPE['metric'], service_code=self.service_code)) + ', ' + metric
+            ddid_content.append(line)
+        for tag in self._config['tags']:
+            line = str(DataDictionaryId(dd_type=_DD_TYPE['tag'], service_code=self.service_code)) + ', ' + tag['name']
+            ddid_content.append(line)
+            for tag_value in tag['values']:
+                line = str(DataDictionaryId(dd_type=_DD_TYPE['tag_value'], service_code=self.service_code)) + ', ' + tag_value['disc']
+                ddid_content.append(line)
         # 建立SDU数据表
         sdu_table_name = self.service_id + '_sdu'
         DBConnector.init_table(sdu_table_name, {'owner': 'VARCHAR(16)', 'tag': 'INT'})
