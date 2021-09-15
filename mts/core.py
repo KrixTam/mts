@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import csv
+import os.path
 import sqlite3
 from os import path, getpid
 from config import config
@@ -39,6 +40,17 @@ _DD_TYPE = {
     'tag_value': 4
 }
 
+_DD_HEADERS = 'ddid, disc'
+
+_DD_FILE_TYPE = 'dd'
+_SDU_FILE_TYPE = 'sdu'
+_TDU_FILE_TYPE = 'tdu'
+
+_FILE_EXT = {
+    _DD_FILE_TYPE: '.dd',
+    _SDU_FILE_TYPE: '.sdu',
+    _TDU_FILE_TYPE: '.tdu'
+}
 
 class ObjectId(object):
     _pid = getpid()
@@ -446,7 +458,7 @@ class DataUnitService(object):
         # 建立DD数据表
         dd_table_name = self.service_id + '_dd'
         DBConnector.init_table(dd_table_name, {'ddid': 'VARCHAR(16)', 'disc': 'VARCHAR(160)'})
-        # 初始化ddid
+        # 初始化ddid数据
         ddid_content = []
         for owner in self._config['owners']:
             line = str(DataDictionaryId(dd_type=_DD_TYPE['owner'], service_code=self.service_code)) + ', ' + owner
@@ -460,14 +472,37 @@ class DataUnitService(object):
             for tag_value in tag['values']:
                 line = str(DataDictionaryId(dd_type=_DD_TYPE['tag_value'], service_code=self.service_code)) + ', ' + tag_value['disc']
                 ddid_content.append(line)
+        dd_filename = self._get_filename(_DD_FILE_TYPE)
+        DataUnitService.write_file(dd_filename, _DD_HEADERS, ddid_content)
+        # 导入数据到数据库表
+        DBConnector.import_data(dd_filename, dd_table_name)
         # 建立SDU数据表
         sdu_table_name = self.service_id + '_sdu'
         DBConnector.init_table(sdu_table_name, {'owner': 'VARCHAR(16)', 'tag': 'INT'})
         # 建立TDU数据表
         # tdu_table_name =
 
-    def import_data(self):
-        sdu_data_filename = path.join(self.ds_path(), self.service_id() + '.sdu')
+    def _get_filename(self, file_type, *args):
+        if file_type in _FILE_EXT:
+            if file_type == _DD_FILE_TYPE or file_type == _SDU_FILE_TYPE:
+                return os.path.join(self._config['ds_path'], self.service_id + _FILE_EXT[file_type])
+            else:
+                if isinstance(args[0], list):
+                    filenames = []
+                    for owner_id in args[0]:
+                        filenames.append(os.path.join(self._config['ds_path'], self.service_id + '_' + owner_id + _FILE_EXT[file_type]))
+                    return filenames
+                else:
+                    if isinstance(args[0], str):
+                        return os.path.join(self._config['ds_path'], self.service_id + '_' + args[0] + _FILE_EXT[file_type])
+                    else:
+                        raise TypeError('File type "%s" should with parameter of a list of owner ids or one owner id.' % (file_type,))
+        else:
+            raise ValueError('Unknown file type to get the filename.')
+
+    def import_data(self, file_type, table_name, *args):
+        filename = self._get_filename(file_type, *args)
+        DBConnector.import_data(filename, table_name)
 
     def export_data(self, output_filename):
         pass
@@ -504,13 +539,18 @@ class DBConnector(object):
         return cx.read_sql(DBConnector._db_url, sql)
 
     @staticmethod
+    def get_cursor():
+        db_path = DBConnector._db_url.split('://')[1]
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        return conn, cursor
+
+    @staticmethod
     def init_table(table_name, fields):
         if DBConnector._db_url is None:
             raise ValueError('Please register db_url to DBConnector first.')
         else:
-            db_path = DBConnector._db_url.split('://')[1]
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
+            conn, cursor = DBConnector.get_cursor()
             # 如果存在table，先drop掉
             sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + table_name + "'"
             cursor.execute(sql)
@@ -523,6 +563,18 @@ class DBConnector(object):
             sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields) + ")"
             print(sql)
             cursor.execute(sql)
+            conn.close()
+
+    @staticmethod
+    def import_data(filename, table_name):
+        conn, cursor = DBConnector.get_cursor()
+        with open(filename, 'r') as fin:
+            dr = csv.DictReader(fin)
+            to_db = [tuple([row[field] for field in dr.fieldnames]) for row in dr]
+            sql = 'INSERT INTO ' + table_name + ' ' + str(tuple(dr.fieldnames)) + ' VALUES (' + ', '.join(list('?' * len(dr.fieldnames))) + ');'
+            cursor.executemany(sql, to_db)
+            cursor.commit()
+        conn.close()
 
 
 class DataUnit(object):
