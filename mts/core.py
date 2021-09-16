@@ -45,7 +45,7 @@ _DD_TYPE = {
     _DD_TYPE_TAG_VALUE: 4
 }
 
-_DD_HEADERS = 'ddid, disc'
+_DD_HEADERS = 'ddid, disc, mask'
 
 _FILE_TYPE_DD = 'dd'
 _FILE_TYPE_SDU = 'sdu'
@@ -63,7 +63,7 @@ _FILE_EXT = {
     _FILE_TYPE_TDU: '.tdu'
 }
 
-_FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)'}
+_FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)', 'mask': 'INT'}
 
 
 class ObjectId(object):
@@ -523,15 +523,18 @@ class DataUnitService(object):
 
     @property
     def owners(self):
-        return self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_OWNER]]
+        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_OWNER]]
+        return data['ddid']
 
     @property
     def metrics(self):
-        return self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_METRIC]]
+        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_METRIC]]
+        return data['ddid']
 
     @property
     def tags(self):
-        return self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_TAG]]
+        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_TAG]]
+        return data['ddid']
 
     def load_dd(self):
         self._dd = DBConnector.query(self._get_table_name(_TABLE_TYPE_DD))
@@ -558,16 +561,19 @@ class DataUnitService(object):
         # 初始化ddid数据
         ddid_content = []
         for owner in self._config['owners']:
-            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_OWNER], service_code=self.service_code)) + ', ' + owner
+            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_OWNER], service_code=self.service_code)) + ', ' + owner + ', 0'
             ddid_content.append(line)
         for metric in self._config['metrics']:
-            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_METRIC], service_code=self.service_code)) + ', ' + metric
+            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_METRIC], service_code=self.service_code)) + ', ' + metric + ', 0'
             ddid_content.append(line)
         for tag in self._config['tags']:
-            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG], service_code=self.service_code)) + ', ' + tag['name']
+            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG], service_code=self.service_code)) + ', ' + tag['name'] + ', 0'
             ddid_content.append(line)
+            mask_bit = 0
             for tag_value in tag['values']:
-                line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG_VALUE], service_code=self.service_code)) + ', ' + tag_value['disc']
+                mask_bit = mask_bit + 1
+                mask = -1 ^ (-1 << mask_bit)
+                line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG_VALUE], service_code=self.service_code)) + ', ' + tag_value['disc'] + ', ' + str(mask)
                 ddid_content.append(line)
         dd_filename = self._get_filename(_FILE_TYPE_DD)
         DataUnitService.write_file(dd_filename, _DD_HEADERS, ddid_content)
