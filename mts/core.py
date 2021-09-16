@@ -391,6 +391,31 @@ class DBConnector(object):
             cursor.executemany(sql, to_db)
         cursor.close()
 
+    @staticmethod
+    def get_table_name(service_id: str, table_type: str, owner_id: str = None):
+        if table_type in _TABLE_TYPE:
+            if table_type == _TABLE_TYPE_DD:
+                return service_id + '_dd'
+            else:
+                if table_type == _TABLE_TYPE_SDU:
+                    return service_id + '_sdu'
+                else:
+                    if owner_id is None:
+                        raise ValueError('owner_id can not be None')
+                    else:
+                        return service_id + '_' + owner_id + '_tdu'
+        else:
+            raise ValueError('table_type should be one of %s' % (_TABLE_TYPE,))
+
+    @staticmethod
+    def get_dd(service_id: str, dd_type: str):
+        if dd_type in _DD_TYPE:
+            table_name = DBConnector.get_table_name(service_id, _TABLE_TYPE_DD)
+            dd = DBConnector.query(table_name)
+            return dd[dd['ddid'].str[0] == hex(_DD_TYPE[dd_type])[-1]]
+        else:
+            raise ValueError('Unknown dd_type "%s".' % (dd_type,))
+
 
 class DataUnitProcessor(object):
     def __init__(self, settings):
@@ -512,6 +537,7 @@ class DataUnitService(object):
         self.load_dd()
         # TODO
         # TDU?SDU?初始化？
+        # 直接load数据初始化的处理后续要考虑
 
     @property
     def service_id(self):
@@ -523,36 +549,24 @@ class DataUnitService(object):
 
     @property
     def owners(self):
-        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_OWNER]]
+        data = self._dd[self._dd['ddid'].str[0] == hex(_DD_TYPE[_DD_TYPE_OWNER])[-1]]
         return data['ddid']
 
     @property
     def metrics(self):
-        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_METRIC]]
+        data = self._dd[self._dd['ddid'].str[0] == hex(_DD_TYPE[_DD_TYPE_METRIC])[-1]]
         return data['ddid']
 
     @property
     def tags(self):
-        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_TAG]]
+        data = self._dd[self._dd['ddid'].str[0] == hex(_DD_TYPE[_DD_TYPE_TAG])[-1]]
         return data['ddid']
 
     def load_dd(self):
         self._dd = DBConnector.query(self._get_table_name(_TABLE_TYPE_DD))
 
     def _get_table_name(self, table_type: str, owner_id: str = None):
-        if table_type in _TABLE_TYPE:
-            if table_type == _TABLE_TYPE_DD:
-                return self.service_id + '_dd'
-            else:
-                if table_type == _TABLE_TYPE_SDU:
-                    return self.service_id + '_sdu'
-                else:
-                    if owner_id is None:
-                        raise ValueError('owner_id can not be None')
-                    else:
-                        return self.service_id + '_' + owner_id + '_tdu'
-        else:
-            raise ValueError('table_type should be one of %s' % (_TABLE_TYPE,))
+        return DBConnector.get_table_name(self.service_id, table_type, owner_id)
 
     def init_tables(self):
         # 建立DD数据表
@@ -643,5 +657,7 @@ class TimeDataUnit(DataUnit):
 
 
 class SpaceDataUnit(DataUnit):
-    def __init__(self, tag):
+    def __init__(self, service_id, tags=None):
         super().__init__()
+        dd_tag = DBConnector.get_dd(service_id, _DD_TYPE_TAG)
+        dd_tag_value = DBConnector.get_dd(service_id, _DD_TYPE_TAG_VALUE)
