@@ -11,6 +11,16 @@ from moment import moment
 from random import getrandbits
 import pandas as pd
 
+
+def hex_str(num, bits):
+    length = abs(bits)
+    res = "{0:0{1}x}".format(num, length)
+    if bits > 0:
+        return res[:bits]
+    else:
+        return res[bits:]
+
+
 _SERVICE_CODE_BITS = 6
 _TIMESTAMP_BITS = 42
 _PID_CODE_BITS = 4
@@ -39,10 +49,10 @@ _DD_TYPE_TAG = 'tag'
 _DD_TYPE_TAG_VALUE = 'tag_value'
 
 _DD_TYPE = {
-    _DD_TYPE_OWNER: 1,
-    _DD_TYPE_METRIC: 2,
-    _DD_TYPE_TAG: 3,
-    _DD_TYPE_TAG_VALUE: 4
+    _DD_TYPE_OWNER: hex_str(1, 1),
+    _DD_TYPE_METRIC: hex_str(2, 1),
+    _DD_TYPE_TAG: hex_str(3, 1),
+    _DD_TYPE_TAG_VALUE: hex_str(4, 1)
 }
 
 _DD_HEADERS = 'ddid, disc, mask'
@@ -63,7 +73,7 @@ _FILE_EXT = {
     _FILE_TYPE_TDU: '.tdu'
 }
 
-_FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)', 'mask': 'INT'}
+_FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR(32)'}
 
 
 class ObjectId(object):
@@ -91,10 +101,10 @@ class ObjectId(object):
                 if isinstance(oid, ObjectId):
                     self._generate(str(oid))
                 else:
-                    raise TypeError("id must be an instance of (str, ObjectId), not %s" % (type(oid),))
+                    raise TypeError("id 应为 (str, ObjectId)，而非 %s" % (type(oid),))
 
     def __str__(self):
-        return "{0:0{1}x}".format(self._id, 16)
+        return hex_str(self._id, 16)
 
     def __repr__(self):
         service_code, ts, pid_code, sequence = ObjectId.unpack(self._id)
@@ -121,7 +131,7 @@ class ObjectId(object):
         pid_code = (oid >> _TIMESTAMP_BITS_SHIFT) & _PID_CODE_MASK
         sequence = oid & _SEQUENCE_MASK
         if last_ts <= 0:
-            raise ValueError('Invalid id. Time is moving backwards.')
+            raise ValueError('非法 id；时间逆流。')
         return service_code, last_ts, pid_code, sequence
 
     @classmethod
@@ -135,7 +145,7 @@ class ObjectId(object):
     def _generate(self, oid: str = None):
         if oid is None:
             ts = moment()
-            assert ts.unix() >= ObjectId._epoch, "clock is moving backwards"
+            assert ts.unix() >= ObjectId._epoch, "异常：时间逆流。"
             ts = (ts.unix() - ObjectId._epoch) * 1000 + ts.milliseconds()
             pid_code = ObjectId._generate_pid_code()
             sequence = 0
@@ -162,10 +172,10 @@ class ObjectId(object):
                 self._id = oid_value
                 self._sc = ObjectId._service_code
             except ValueError:
-                print('id is invalid. Program will generate a new Object ID.')
+                print('非法 id；将自动生成一个新的 Object ID。')
                 self._generate()
         else:
-            print('id is invalid. Program will generate a new Object ID.')
+            print('非法 id；将自动生成一个新的 Object ID。')
             self._generate()
 
     @staticmethod
@@ -234,25 +244,31 @@ class DataDictionaryId(object):
                 if isinstance(ddid, str):
                     self._generate(ddid)
                 else:
-                    raise TypeError("ddid must be an instance of (str, DataDictionaryId), not %s" % (type(ddid),))
+                    raise TypeError("ddid 应为 (str, DataDictionaryId)，而非 %s" % (type(ddid),))
         else:
             if 'oid' in kwargs and 'dd_type' in kwargs:
-                self._id = DataDictionaryId.pack(kwargs['dd_type'], kwargs['oid'])
+                dd_type = kwargs['dd_type']
+                if isinstance(dd_type, str):
+                    dd_type = int(dd_type, 16)
+                self._id = DataDictionaryId.pack(dd_type, kwargs['oid'])
             else:
                 if 'dd_type' in kwargs and 'service_code' in kwargs:
+                    dd_type = kwargs['dd_type']
+                    if isinstance(dd_type, str):
+                        dd_type = int(dd_type, 16)
                     oid = ObjectId(service_code=kwargs['service_code'])
-                    self._id = DataDictionaryId.pack(kwargs['dd_type'], oid.value)
+                    self._id = DataDictionaryId.pack(dd_type, oid.value)
                 else:
-                    raise ValueError('Invalid parameters for DataDictionaryId.')
+                    raise ValueError('构建 DataDictionaryId 时，遇到异常的参数。')
 
     def __str__(self):
-        return "{0:0{1}x}".format(self._id, 17)
+        return hex_str(self._id, 17)
 
     def __repr__(self):
         dd_type, oid = DataDictionaryId.unpack(self._id)
         content = "DataDictionaryId('%s')\n" % (str(self),)
         content = content + "Data Dictionary Type: %s\n" % (dd_type,)
-        oid_str = "{0:0{1}x}".format(oid, 16)
+        oid_str = hex_str(oid, 16)
         content = content + "ObjectId: %s\n" % (oid_str,)
         return content
 
@@ -269,13 +285,13 @@ class DataDictionaryId(object):
             if isinstance(ddid, str) and len(ddid) == 17:
                 ddid_value = int(ddid, 16)
             else:
-                raise TypeError("ddid must be an instance of str, which contains 17 characters, or an instance of DataDictionaryId.")
+                raise TypeError("ddid 应为17位长度的字符串，或者是 DataDictionaryId 实例。")
         dd_type = ddid_value >> _DD_TYPE_BITS_SHIFT
         oid = ddid_value & _OID_MASK
         if ObjectId.validate(oid) and dd_type in _DD_TYPE.values():
             return dd_type, oid
         else:
-            raise ValueError('Invalid ddid.')
+            raise ValueError('异常：非法 ddid。')
 
     @staticmethod
     def pack(dd_type: int, oid: int):
@@ -292,7 +308,7 @@ class DataDictionaryId(object):
 
     @property
     def oid(self):
-        return self._id & _OID_MASK
+        return hex_str(self._id, -16)
 
     def __eq__(self, other):
         if isinstance(other, DataDictionaryId):
@@ -364,7 +380,7 @@ class DBConnector(object):
     @staticmethod
     def init_table(table_name, fields):
         if DBConnector._db_url is None:
-            raise ValueError('Please register db_url to DBConnector first.')
+            raise ValueError('DBConnector 需要对 db_url 进行登记后方能使用。')
         else:
             cursor = DBConnector.get_cursor()
             # 如果存在table，先drop掉
@@ -401,20 +417,20 @@ class DBConnector(object):
                     return service_id + '_sdu'
                 else:
                     if owner_id is None:
-                        raise ValueError('owner_id can not be None')
+                        raise ValueError('owner_id 不能为 None。')
                     else:
                         return service_id + '_' + owner_id + '_tdu'
         else:
-            raise ValueError('table_type should be one of %s' % (_TABLE_TYPE,))
+            raise ValueError('table_type 应为 (%s)' % (_TABLE_TYPE,))
 
     @staticmethod
     def get_dd(service_id: str, dd_type: str):
         if dd_type in _DD_TYPE:
             table_name = DBConnector.get_table_name(service_id, _TABLE_TYPE_DD)
             dd = DBConnector.query(table_name)
-            return dd[dd['ddid'].str[0] == hex(_DD_TYPE[dd_type])[-1]]
+            return dd[dd['ddid'].str[0] == _DD_TYPE[dd_type]]
         else:
-            raise ValueError('Unknown dd_type "%s".' % (dd_type,))
+            raise ValueError('异常：未能识别的 dd_type "%s".' % (dd_type,))
 
 
 class DataUnitProcessor(object):
@@ -446,7 +462,7 @@ class DataUnitProcessor(object):
                 ds_object = DataUnitService(ds)
                 self._ds[ds_object.service_id] = ds_object
             else:
-                raise TypeError("ds must be an instance of (DataService, dict), not %s" % (type(ds),))
+                raise TypeError("ds 应为 (DataService, dict)，而非 %s" % (type(ds),))
 
     def init_service(self, service_id: str):
         if service_id in self._ds:
@@ -549,17 +565,17 @@ class DataUnitService(object):
 
     @property
     def owners(self):
-        data = self._dd[self._dd['ddid'].str[0] == hex(_DD_TYPE[_DD_TYPE_OWNER])[-1]]
+        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_OWNER]]
         return data['ddid']
 
     @property
     def metrics(self):
-        data = self._dd[self._dd['ddid'].str[0] == hex(_DD_TYPE[_DD_TYPE_METRIC])[-1]]
+        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_METRIC]]
         return data['ddid']
 
     @property
     def tags(self):
-        data = self._dd[self._dd['ddid'].str[0] == hex(_DD_TYPE[_DD_TYPE_TAG])[-1]]
+        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_TAG]]
         return data['ddid']
 
     def load_dd(self):
@@ -574,21 +590,36 @@ class DataUnitService(object):
         DBConnector.init_table(dd_table_name, _FIELDS_DD)
         # 初始化ddid数据
         ddid_content = []
+        owner_mappings = {}
+        tag_mappings = {}
+        tag_value_mappings = {}
         for owner in self._config['owners']:
-            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_OWNER], service_code=self.service_code)) + ', ' + owner + ', 0'
+            owner_ddid = DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_OWNER], service_code=self.service_code)
+            owner_mappings[owner] = owner_ddid.oid
+            line = str(owner_ddid) + ',' + owner + ','
             ddid_content.append(line)
         for metric in self._config['metrics']:
-            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_METRIC], service_code=self.service_code)) + ', ' + metric + ', 0'
+            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_METRIC], service_code=self.service_code)) + ',' + metric + ','
             ddid_content.append(line)
         for tag in self._config['tags']:
-            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG], service_code=self.service_code)) + ', ' + tag['name'] + ', 0'
+            tag_ddid = DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG], service_code=self.service_code)
+            tag_oid = tag_ddid.oid
+            tag_mappings[tag['name']] = tag_ddid.oid
+            line = str(tag_ddid) + ',' + tag['name'] + ','
             ddid_content.append(line)
+            tag_value_mappings[tag_oid] = {}
             mask_bit = 0
             for tag_value in tag['values']:
                 mask_bit = mask_bit + 1
                 mask = -1 ^ (-1 << mask_bit)
-                line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG_VALUE], service_code=self.service_code)) + ', ' + tag_value['disc'] + ', ' + str(mask)
+                mask_str = tag_oid + hex_str(mask_bit, 16)
+                line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG_VALUE], service_code=self.service_code)) + ',' + tag_value['disc'] + ',' + mask_str
                 ddid_content.append(line)
+                for owner in tag_value['owners']:
+                    if owner in tag_value_mappings[tag_oid]:
+                        tag_value_mappings[tag_oid][owner] = tag_value_mappings[tag_oid][owner] + mask
+                    else:
+                        tag_value_mappings[tag_oid][owner] = mask
         dd_filename = self._get_filename(_FILE_TYPE_DD)
         DataUnitService.write_file(dd_filename, _DD_HEADERS, ddid_content)
         # 导入数据到数据库表
@@ -600,8 +631,20 @@ class DataUnitService(object):
         for tag in self.tags:
             sdu_fields[tag] = 'INT'
         DBConnector.init_table(sdu_table_name, sdu_fields)
-        # TODO
         # 初始化SDU数据
+        sdu_content = {}
+        sdu_headers = ['owner']
+        for owner, owner_oid in owner_mappings.items():
+            sdu_content[owner_oid] = {}
+            for tag, tag_oid in tag_mappings.items():
+                sdu_content[owner_oid][tag_oid] = 0
+        for tag_oid, value in tag_value_mappings.items():
+            sdu_headers.append(tag_oid)
+            for owner, tag_value in value.items():
+                owner_oid = owner_mappings[owner]
+                sdu_content[owner_oid][tag_oid] = tag_value
+        sdu_filename = self._get_filename(_FILE_TYPE_SDU)
+        DataUnitService.write_file(sdu_filename, sdu_headers, sdu_content)
         # 建立TDU数据表
         tdu_fields = {'timestamp': 'VARCHAR(16)'}  # String of Unix Millisecond Timestamp
         for metric in self.metrics:
@@ -626,9 +669,9 @@ class DataUnitService(object):
                     if isinstance(args[0], str):
                         return path.join(self._config['ds_path'], self.service_id + '_' + args[0] + _FILE_EXT[file_type])
                     else:
-                        raise TypeError('File type "%s" should with parameter of a list of owner ids or one owner id.' % (file_type,))
+                        raise TypeError('文件类型 "%s" 后必须跟有一个值为 owner id 的参数，或者一个存储着一系列 owner id 的 list' % (file_type,))
         else:
-            raise ValueError('Unknown file type to get the filename.')
+            raise ValueError('并非预先定义的 file_type，获取文件名失败')
 
     def import_data(self, file_type, table_name, *args):
         filename = self._get_filename(file_type, *args)
@@ -640,11 +683,35 @@ class DataUnitService(object):
     @staticmethod
     def write_file(output_filename, headers, content):
         with open(output_filename, 'w', newline='') as file_handler:
-            wr = csv.writer(file_handler)
-            if len(headers) > 0:
-                wr.writerow(headers)
-            for line in content:
-                wr.writerow(line)
+            if isinstance(content, list):
+                wr = csv.writer(file_handler)
+                if isinstance(headers, str):
+                    if len(headers) > 0:
+                        wr.writerow(headers)
+                else:
+                    if isinstance(headers, list):
+                        wr.writerow(','.join(headers))
+                    else:
+                        raise TypeError('headers 的类型必须为包含","的字符串或字符串list')
+                for line in content:
+                    wr.writerow(line)
+            else:
+                if isinstance(content, dict):
+                    if isinstance(headers, list):
+                        writer = csv.DictWriter(file_handler, fieldnames=headers)
+                        writer.writeheader()
+                        first_field = headers[0]
+                        other_fields = headers.copy()
+                        del other_fields[0]
+                        for first_field_value, items in content.items():
+                            line = {first_field: first_field_value}
+                            for field in other_fields:
+                                line[field] = items[field]
+                            writer.writerow(line)
+                    else:
+                        raise TypeError('当 content 为 dict 时，headers必须为字符串的 list')
+                else:
+                    raise TypeError('content 的类型必须为 list 或 dict')
 
 
 class DataUnit(object):
@@ -657,7 +724,17 @@ class TimeDataUnit(DataUnit):
 
 
 class SpaceDataUnit(DataUnit):
-    def __init__(self, service_id, tags=None):
+    def __init__(self, service_id, tag_definition_raw=None):
         super().__init__()
         dd_tag = DBConnector.get_dd(service_id, _DD_TYPE_TAG)
         dd_tag_value = DBConnector.get_dd(service_id, _DD_TYPE_TAG_VALUE)
+        self._tag_definition = {}
+        for index, row in dd_tag.iterrows():
+            tag_oid = row['ddid'][1:]
+            self._tag_definition[tag_oid] = {}
+        for index, row in dd_tag_value.iterrows():
+            tag_value_oid = row['ddid'][1:]
+            tag_oid = row['oid_mask'][:16]
+            tag_value_mask = row['oid_mask'][16:]
+            self._tag_definition[tag_oid][tag_value_oid] = tag_value_mask
+
