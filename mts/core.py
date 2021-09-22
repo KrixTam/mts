@@ -55,7 +55,7 @@ _DD_TYPE = {
     _DD_TYPE_TAG_VALUE: hex_str(4, 1)
 }
 
-_DD_HEADERS = 'ddid, disc, mask'
+_DD_HEADERS = 'ddid,disc,oid_mask'
 
 _FILE_TYPE_DD = 'dd'
 _FILE_TYPE_SDU = 'sdu'
@@ -342,7 +342,7 @@ class DataDictionaryId(object):
 
 
 class DBConnector(object):
-    _db_url = None
+    _db_url = None  # sqlite:///path/to/db
     _connection = None
 
     def __init__(self):
@@ -361,6 +361,7 @@ class DBConnector(object):
             sql = sql + ', '.join(fields) + table_name
         if condition is not None:
             sql = sql + 'WHERE ' + condition
+        print(sql)
         return cx.read_sql(DBConnector._db_url, sql)
 
     @staticmethod
@@ -390,9 +391,10 @@ class DBConnector(object):
                 sql = "DROP TABLE " + table_name
                 cursor.execute(sql)
             # 创建table
+            fields_def = []
             for key, value in fields.items():
-                fields.append('[' + key + '] ' + value)
-            sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields) + ")"
+                fields_def.append('[' + key + '] ' + value)
+            sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields_def) + ")"
             print(sql)
             cursor.execute(sql)
             cursor.close()
@@ -404,6 +406,9 @@ class DBConnector(object):
             dr = csv.DictReader(fin)
             to_db = [tuple([row[field] for field in dr.fieldnames]) for row in dr]
             sql = 'INSERT INTO ' + table_name + ' ' + str(tuple(dr.fieldnames)) + ' VALUES (' + ', '.join(list('?' * len(dr.fieldnames))) + ');'
+            print(sql)
+            # sql = 'INSERT INTO ' + table_name + ' (' + ''.join(dr.fieldnames) + ') VALUES (' + ', '.join(
+            #     list('?' * len(dr.fieldnames))) + ');'
             cursor.executemany(sql, to_db)
         cursor.close()
 
@@ -411,15 +416,15 @@ class DBConnector(object):
     def get_table_name(service_id: str, table_type: str, owner_id: str = None):
         if table_type in _TABLE_TYPE:
             if table_type == _TABLE_TYPE_DD:
-                return service_id + '_dd'
+                return 'dd_' + service_id
             else:
                 if table_type == _TABLE_TYPE_SDU:
-                    return service_id + '_sdu'
+                    return 'sdu_' + service_id
                 else:
                     if owner_id is None:
                         raise ValueError('owner_id 不能为 None。')
                     else:
-                        return service_id + '_' + owner_id + '_tdu'
+                        return 'tdu' + service_id + '_' + owner_id
         else:
             raise ValueError('table_type 应为 (%s)' % (_TABLE_TYPE,))
 
@@ -475,7 +480,7 @@ class DataUnitProcessor(object):
 class DataUnitService(object):
     __slots__ = ('_dd', '_config',)
 
-    def __init__(self, settings):
+    def __init__(self, settings, init_flag=False):
         self._config = config({
             'name': 'DataUnitService',
             'default': {
@@ -495,7 +500,6 @@ class DataUnitService(object):
                         ]
                     }
                 ]
-
             },
             'schema': {
                 'type': 'object',
@@ -550,7 +554,10 @@ class DataUnitService(object):
             if key in self._config:
                 self._config[key] = value
         self._dd = None
-        self.load_dd()
+        if init_flag:
+            self.init_tables()
+        else:
+            self.load_dd()
         # TODO
         # TDU?SDU?初始化？
         # 直接load数据初始化的处理后续要考虑
@@ -684,17 +691,16 @@ class DataUnitService(object):
     def write_file(output_filename, headers, content):
         with open(output_filename, 'w', newline='') as file_handler:
             if isinstance(content, list):
-                wr = csv.writer(file_handler)
                 if isinstance(headers, str):
                     if len(headers) > 0:
-                        wr.writerow(headers)
+                        file_handler.write(headers + '\n')
                 else:
                     if isinstance(headers, list):
-                        wr.writerow(','.join(headers))
+                        file_handler.write(','.join(headers) + '\n')
                     else:
                         raise TypeError('headers 的类型必须为包含","的字符串或字符串list')
                 for line in content:
-                    wr.writerow(line)
+                    file_handler.write(line + '\n')
             else:
                 if isinstance(content, dict):
                     if isinstance(headers, list):
