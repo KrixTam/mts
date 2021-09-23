@@ -1,15 +1,16 @@
 import unittest
 from mts.core import DataDictionaryId
+from mts.const import *
 
 
 class TestDataDictionaryId(unittest.TestCase):
     def test_default(self):
-        a = DataDictionaryId(ddid='a000548d4e5abb001')
-        self.assertEqual(a.oid, int('000548d4e5abb001', 16))
-        self.assertEqual(a.dd_type, int('a', 16))
-        b = DataDictionaryId(dd_type=1, oid=int('000548d4e5abb002', 16))
-        self.assertEqual(b.oid, int('000548d4e5abb002', 16))
-        self.assertEqual(b.dd_type, 1)
+        a = DataDictionaryId(ddid='2000548d4e5abb001')
+        self.assertEqual(a.oid, '000548d4e5abb001')
+        self.assertEqual(a.dd_type, DD_TYPE[DD_TYPE_METRIC])
+        b = DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_OWNER], oid=int('000548d4e5abb002', 16))
+        self.assertEqual(b.oid, '000548d4e5abb002')
+        self.assertEqual(b.dd_type, DD_TYPE[DD_TYPE_OWNER])
         print(a.__repr__())
         print(b.__repr__())
 

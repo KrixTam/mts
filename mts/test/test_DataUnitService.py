@@ -1,10 +1,11 @@
 import unittest
 import os
 from mts.core import DataUnitService, DBConnector
+from mts.const import *
 
 
 class TestDataUnitService(unittest.TestCase):
-    def test_something(self):
+    def test_constructor(self):
         settings = {
             'service_id': '01',
             'ds_path': os.path.join('resources', 'ds'),
@@ -35,7 +36,7 @@ class TestDataUnitService(unittest.TestCase):
         print(db_url)
         DBConnector.register(db_url)
         ds = DataUnitService(settings, True)
-        self.assertEqual(True, True)
+        self.assertEqual(ds.disc(dd_type=DD_TYPE_METRIC), settings['metrics'].sort())
 
 
 if __name__ == '__main__':

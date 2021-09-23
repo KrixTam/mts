@@ -10,70 +10,7 @@ import logging
 from moment import moment
 from random import getrandbits
 import pandas as pd
-
-
-def hex_str(num, bits):
-    length = abs(bits)
-    res = "{0:0{1}x}".format(num, length)
-    if bits > 0:
-        return res[:bits]
-    else:
-        return res[bits:]
-
-
-_SERVICE_CODE_BITS = 6
-_TIMESTAMP_BITS = 42
-_PID_CODE_BITS = 4
-_SEQUENCE_BITS = 12
-
-_SERVICE_CODE_BITS_SHIFT = _TIMESTAMP_BITS + _PID_CODE_BITS + _SEQUENCE_BITS
-_TIMESTAMP_BITS_SHIFT = _PID_CODE_BITS + _SEQUENCE_BITS
-_PID_CODE_BITS_SHIFT = _SEQUENCE_BITS
-
-_SERVICE_CODE_MASK = -1 ^ (-1 << _SERVICE_CODE_BITS)
-_TIMESTAMP_MASK = -1 ^ (-1 << _TIMESTAMP_BITS)
-_PID_CODE_MASK = -1 ^ (-1 << _PID_CODE_BITS)
-_SEQUENCE_MASK = -1 ^ (-1 << _SEQUENCE_BITS)
-
-_DD_TYPE_BITS = 4
-_OID_BITS = 64
-
-_DD_TYPE_BITS_SHIFT = _OID_BITS
-
-_DD_TYPE_MASK = -1 ^ (-1 << _DD_TYPE_BITS)
-_OID_MASK = -1 ^ (-1 << _OID_BITS)
-
-_DD_TYPE_OWNER = 'owner'
-_DD_TYPE_METRIC = 'metric'
-_DD_TYPE_TAG = 'tag'
-_DD_TYPE_TAG_VALUE = 'tag_value'
-
-_DD_TYPE = {
-    _DD_TYPE_OWNER: hex_str(1, 1),
-    _DD_TYPE_METRIC: hex_str(2, 1),
-    _DD_TYPE_TAG: hex_str(3, 1),
-    _DD_TYPE_TAG_VALUE: hex_str(4, 1)
-}
-
-_DD_HEADERS = 'ddid,disc,oid_mask'
-
-_FILE_TYPE_DD = 'dd'
-_FILE_TYPE_SDU = 'sdu'
-_FILE_TYPE_TDU = 'tdu'
-
-_TABLE_TYPE_DD = 'dd'
-_TABLE_TYPE_SDU = 'sdu'
-_TABLE_TYPE_TDU = 'tdu'
-
-_TABLE_TYPE = [_TABLE_TYPE_DD, _TABLE_TYPE_SDU, _TABLE_TYPE_TDU]
-
-_FILE_EXT = {
-    _FILE_TYPE_DD: '.dd',
-    _FILE_TYPE_SDU: '.sdu',
-    _FILE_TYPE_TDU: '.tdu'
-}
-
-_FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR(32)'}
+from mts.const import *
 
 
 class ObjectId(object):
@@ -120,16 +57,16 @@ class ObjectId(object):
     @staticmethod
     def register(settings):
         if 'epoch' in settings and isinstance(settings['epoch'], int):
-            ObjectId._epoch = settings['epoch'] & _TIMESTAMP_MASK
+            ObjectId._epoch = settings['epoch'] & TIMESTAMP_MASK
         if 'service_code' in settings and isinstance(settings['service_code'], int):
-            ObjectId._service_code = settings['service_code'] & _SERVICE_CODE_MASK
+            ObjectId._service_code = settings['service_code'] & SERVICE_CODE_MASK
 
     @staticmethod
     def unpack(oid):
-        service_code = oid >> _SERVICE_CODE_BITS_SHIFT
-        last_ts = (oid >> _TIMESTAMP_BITS_SHIFT) & _TIMESTAMP_MASK
-        pid_code = (oid >> _TIMESTAMP_BITS_SHIFT) & _PID_CODE_MASK
-        sequence = oid & _SEQUENCE_MASK
+        service_code = oid >> SERVICE_CODE_BITS_SHIFT
+        last_ts = (oid >> TIMESTAMP_BITS_SHIFT) & TIMESTAMP_MASK
+        pid_code = (oid >> TIMESTAMP_BITS_SHIFT) & PID_CODE_MASK
+        sequence = oid & SEQUENCE_MASK
         if last_ts <= 0:
             raise ValueError('非法 id；时间逆流。')
         return service_code, last_ts, pid_code, sequence
@@ -151,14 +88,14 @@ class ObjectId(object):
             sequence = 0
             with ObjectId._lock:
                 if ts == ObjectId._last_ts:
-                    ObjectId._sequence = (ObjectId._sequence + 1) & _SEQUENCE_MASK
+                    ObjectId._sequence = (ObjectId._sequence + 1) & SEQUENCE_MASK
                     sequence = ObjectId._sequence
                     if ObjectId._sequence == 0:
                         ts = ts + 1
                 else:
                     ObjectId._sequence = 0
                 ObjectId._last_ts = ts
-            new_id = (self._sc << _SERVICE_CODE_BITS_SHIFT) | (ts << _TIMESTAMP_BITS_SHIFT) | (pid_code << _PID_CODE_BITS_SHIFT) | sequence
+            new_id = (self._sc << SERVICE_CODE_BITS_SHIFT) | (ts << TIMESTAMP_BITS_SHIFT) | (pid_code << PID_CODE_BITS_SHIFT) | sequence
             self._id = new_id
         else:
             self._validate(oid)
@@ -286,16 +223,16 @@ class DataDictionaryId(object):
                 ddid_value = int(ddid, 16)
             else:
                 raise TypeError("ddid 应为17位长度的字符串，或者是 DataDictionaryId 实例。")
-        dd_type = ddid_value >> _DD_TYPE_BITS_SHIFT
-        oid = ddid_value & _OID_MASK
-        if ObjectId.validate(oid) and dd_type in _DD_TYPE.values():
+        dd_type = ddid_value >> DD_TYPE_BITS_SHIFT
+        oid = ddid_value & OID_MASK
+        if ObjectId.validate(oid) and hex_str(dd_type, 1) in DD_TYPE.values():
             return dd_type, oid
         else:
             raise ValueError('异常：非法 ddid。')
 
     @staticmethod
     def pack(dd_type: int, oid: int):
-        ddid = (dd_type << _DD_TYPE_BITS_SHIFT) | oid
+        ddid = (dd_type << DD_TYPE_BITS_SHIFT) | oid
         return ddid
 
     @property
@@ -304,7 +241,7 @@ class DataDictionaryId(object):
 
     @property
     def dd_type(self):
-        return self._id >> _DD_TYPE_BITS_SHIFT
+        return hex_str(self._id >> DD_TYPE_BITS_SHIFT, 1)
 
     @property
     def oid(self):
@@ -414,11 +351,11 @@ class DBConnector(object):
 
     @staticmethod
     def get_table_name(service_id: str, table_type: str, owner_id: str = None):
-        if table_type in _TABLE_TYPE:
-            if table_type == _TABLE_TYPE_DD:
+        if table_type in TABLE_TYPE:
+            if table_type == TABLE_TYPE_DD:
                 return 'dd_' + service_id
             else:
-                if table_type == _TABLE_TYPE_SDU:
+                if table_type == TABLE_TYPE_SDU:
                     return 'sdu_' + service_id
                 else:
                     if owner_id is None:
@@ -426,14 +363,14 @@ class DBConnector(object):
                     else:
                         return 'tdu' + service_id + '_' + owner_id
         else:
-            raise ValueError('table_type 应为 (%s)' % (_TABLE_TYPE,))
+            raise ValueError('table_type 应为 (%s)' % (TABLE_TYPE,))
 
     @staticmethod
     def get_dd(service_id: str, dd_type: str):
-        if dd_type in _DD_TYPE:
-            table_name = DBConnector.get_table_name(service_id, _TABLE_TYPE_DD)
+        if dd_type in DD_TYPE:
+            table_name = DBConnector.get_table_name(service_id, TABLE_TYPE_DD)
             dd = DBConnector.query(table_name)
-            return dd[dd['ddid'].str[0] == _DD_TYPE[dd_type]]
+            return dd[dd['ddid'].str[0] == DD_TYPE[dd_type]]
         else:
             raise ValueError('异常：未能识别的 dd_type "%s".' % (dd_type,))
 
@@ -572,44 +509,62 @@ class DataUnitService(object):
 
     @property
     def owners(self):
-        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_OWNER]]
+        data = self._dd[self._dd['ddid'].str[0] == DD_TYPE[DD_TYPE_OWNER]]
         return data['ddid']
 
     @property
     def metrics(self):
-        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_METRIC]]
+        data = self._dd[self._dd['ddid'].str[0] == DD_TYPE[DD_TYPE_METRIC]]
         return data['ddid']
 
     @property
     def tags(self):
-        data = self._dd[self._dd['ddid'].str[0] == _DD_TYPE[_DD_TYPE_TAG]]
+        data = self._dd[self._dd['ddid'].str[0] == DD_TYPE[DD_TYPE_TAG]]
         return data['ddid']
 
+    def disc(self, ddid: str = None, dd_type: str = None, oid: str = None):
+        data = self._dd
+        if ddid is None:
+            if dd_type is None:
+                if oid is None:
+                    pass
+                else:
+                    data = self._dd[self._dd['ddid'].str[1:] == oid]
+            else:
+                if oid is None:
+                    data = self._dd[self._dd['ddid'].str[0] == DD_TYPE[dd_type]]
+                else:
+                    ddid_val = DD_TYPE[dd_type] + oid
+                    data = self._dd[self._dd['ddid'] == ddid_val]
+        else:
+            data = self._dd[self._dd['ddid'] == ddid]
+        return data['disc'].values.tolist().sort()
+
     def load_dd(self):
-        self._dd = DBConnector.query(self._get_table_name(_TABLE_TYPE_DD))
+        self._dd = DBConnector.query(self._get_table_name(TABLE_TYPE_DD))
 
     def _get_table_name(self, table_type: str, owner_id: str = None):
         return DBConnector.get_table_name(self.service_id, table_type, owner_id)
 
     def init_tables(self):
         # 建立DD数据表
-        dd_table_name = self._get_table_name(_TABLE_TYPE_DD)
-        DBConnector.init_table(dd_table_name, _FIELDS_DD)
+        dd_table_name = self._get_table_name(TABLE_TYPE_DD)
+        DBConnector.init_table(dd_table_name, FIELDS_DD)
         # 初始化ddid数据
         ddid_content = []
         owner_mappings = {}
         tag_mappings = {}
         tag_value_mappings = {}
         for owner in self._config['owners']:
-            owner_ddid = DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_OWNER], service_code=self.service_code)
+            owner_ddid = DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_OWNER], service_code=self.service_code)
             owner_mappings[owner] = owner_ddid.oid
             line = str(owner_ddid) + ',' + owner + ','
             ddid_content.append(line)
         for metric in self._config['metrics']:
-            line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_METRIC], service_code=self.service_code)) + ',' + metric + ','
+            line = str(DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_METRIC], service_code=self.service_code)) + ',' + metric + ','
             ddid_content.append(line)
         for tag in self._config['tags']:
-            tag_ddid = DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG], service_code=self.service_code)
+            tag_ddid = DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_TAG], service_code=self.service_code)
             tag_oid = tag_ddid.oid
             tag_mappings[tag['name']] = tag_ddid.oid
             line = str(tag_ddid) + ',' + tag['name'] + ','
@@ -620,20 +575,20 @@ class DataUnitService(object):
                 mask_bit = mask_bit + 1
                 mask = -1 ^ (-1 << mask_bit)
                 mask_str = tag_oid + hex_str(mask_bit, 16)
-                line = str(DataDictionaryId(dd_type=_DD_TYPE[_DD_TYPE_TAG_VALUE], service_code=self.service_code)) + ',' + tag_value['disc'] + ',' + mask_str
+                line = str(DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_TAG_VALUE], service_code=self.service_code)) + ',' + tag_value['disc'] + ',' + mask_str
                 ddid_content.append(line)
                 for owner in tag_value['owners']:
                     if owner in tag_value_mappings[tag_oid]:
                         tag_value_mappings[tag_oid][owner] = tag_value_mappings[tag_oid][owner] + mask
                     else:
                         tag_value_mappings[tag_oid][owner] = mask
-        dd_filename = self._get_filename(_FILE_TYPE_DD)
-        DataUnitService.write_file(dd_filename, _DD_HEADERS, ddid_content)
+        dd_filename = self._get_filename(FILE_TYPE_DD)
+        DataUnitService.write_file(dd_filename, DD_HEADERS, ddid_content)
         # 导入数据到数据库表
         DBConnector.import_data(dd_filename, dd_table_name)
         self.load_dd()
         # 建立SDU数据表
-        sdu_table_name = self._get_table_name(_TABLE_TYPE_SDU)
+        sdu_table_name = self._get_table_name(TABLE_TYPE_SDU)
         sdu_fields = {'owner': 'VARCHAR(16)'}
         for tag in self.tags:
             sdu_fields[tag] = 'INT'
@@ -650,31 +605,31 @@ class DataUnitService(object):
             for owner, tag_value in value.items():
                 owner_oid = owner_mappings[owner]
                 sdu_content[owner_oid][tag_oid] = tag_value
-        sdu_filename = self._get_filename(_FILE_TYPE_SDU)
+        sdu_filename = self._get_filename(FILE_TYPE_SDU)
         DataUnitService.write_file(sdu_filename, sdu_headers, sdu_content)
         # 建立TDU数据表
         tdu_fields = {'timestamp': 'VARCHAR(16)'}  # String of Unix Millisecond Timestamp
         for metric in self.metrics:
             tdu_fields[metric] = 'VARCHAR(16)'
         for owner in self.owners:
-            tdu_table_name = self._get_table_name(_TABLE_TYPE_TDU, owner)
+            tdu_table_name = self._get_table_name(TABLE_TYPE_TDU, owner)
             DBConnector.init_table(tdu_table_name, tdu_fields)
         # TODO
         # 初始化TDU数据
 
     def _get_filename(self, file_type, *args):
-        if file_type in _FILE_EXT:
-            if file_type == _FILE_TYPE_DD or file_type == _FILE_TYPE_SDU:
-                return path.join(self._config['ds_path'], self.service_id + _FILE_EXT[file_type])
+        if file_type in FILE_EXT:
+            if file_type == FILE_TYPE_DD or file_type == FILE_TYPE_SDU:
+                return path.join(self._config['ds_path'], self.service_id + FILE_EXT[file_type])
             else:
                 if isinstance(args[0], list):
                     filenames = []
                     for owner_id in args[0]:
-                        filenames.append(path.join(self._config['ds_path'], self.service_id + '_' + owner_id + _FILE_EXT[file_type]))
+                        filenames.append(path.join(self._config['ds_path'], self.service_id + '_' + owner_id + FILE_EXT[file_type]))
                     return filenames
                 else:
                     if isinstance(args[0], str):
-                        return path.join(self._config['ds_path'], self.service_id + '_' + args[0] + _FILE_EXT[file_type])
+                        return path.join(self._config['ds_path'], self.service_id + '_' + args[0] + FILE_EXT[file_type])
                     else:
                         raise TypeError('文件类型 "%s" 后必须跟有一个值为 owner id 的参数，或者一个存储着一系列 owner id 的 list' % (file_type,))
         else:
@@ -732,8 +687,8 @@ class TimeDataUnit(DataUnit):
 class SpaceDataUnit(DataUnit):
     def __init__(self, service_id, tag_definition_raw=None):
         super().__init__()
-        dd_tag = DBConnector.get_dd(service_id, _DD_TYPE_TAG)
-        dd_tag_value = DBConnector.get_dd(service_id, _DD_TYPE_TAG_VALUE)
+        dd_tag = DBConnector.get_dd(service_id, DD_TYPE_TAG)
+        dd_tag_value = DBConnector.get_dd(service_id, DD_TYPE_TAG_VALUE)
         self._tag_definition = {}
         for index, row in dd_tag.iterrows():
             tag_oid = row['ddid'][1:]
