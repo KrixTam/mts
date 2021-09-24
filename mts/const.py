@@ -9,6 +9,9 @@ def hex_str(num, bits):
         return res[bits:]
 
 
+EPOCH_DEFAULT = 1608480000
+SERVICE_CODE_MIN = int('101000', 2)
+
 SERVICE_CODE_BITS = 6
 TIMESTAMP_BITS = 42
 PID_CODE_BITS = 4
@@ -31,17 +34,12 @@ DD_TYPE_BITS_SHIFT = OID_BITS
 DD_TYPE_MASK = -1 ^ (-1 << DD_TYPE_BITS)
 OID_MASK = -1 ^ (-1 << OID_BITS)
 
-DD_TYPE_OWNER = 'owner'
-DD_TYPE_METRIC = 'metric'
-DD_TYPE_TAG = 'tag'
-DD_TYPE_TAG_VALUE = 'tag_value'
+DD_TYPE_OWNER = hex_str(1, 1)
+DD_TYPE_METRIC = hex_str(2, 1)
+DD_TYPE_TAG = hex_str(3, 1)
+DD_TYPE_TAG_VALUE = hex_str(4, 1)
 
-DD_TYPE = {
-    DD_TYPE_OWNER: hex_str(1, 1),
-    DD_TYPE_METRIC: hex_str(2, 1),
-    DD_TYPE_TAG: hex_str(3, 1),
-    DD_TYPE_TAG_VALUE: hex_str(4, 1)
-}
+DD_TYPE = [DD_TYPE_OWNER, DD_TYPE_METRIC, DD_TYPE_TAG, DD_TYPE_TAG_VALUE]
 
 DD_HEADERS = 'ddid,disc,oid_mask'
 

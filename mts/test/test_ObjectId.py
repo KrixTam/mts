@@ -17,9 +17,9 @@ class TestObjectId(unittest.TestCase):
 
     def test_register(self):
         a = ObjectId()
-        ObjectId.register({'service_code': 4})
+        ObjectId.register({'service_code': 41})
         c = ObjectId()
-        d = ObjectId(service_code=0)
+        d = ObjectId(service_code=40)
         self.assertNotEqual(a.__repr__().split('\n')[1], c.__repr__().split('\n')[1])
         self.assertEqual(a.__repr__().split('\n')[1], d.__repr__().split('\n')[1])
         b = ObjectId(a)

@@ -16,8 +16,8 @@ from mts.const import *
 class ObjectId(object):
     _pid = getpid()
     _lock = threading.Lock()
-    _epoch = 1608480000
-    _service_code = 0
+    _epoch = EPOCH_DEFAULT
+    _service_code = SERVICE_CODE_MIN
     _pid_code = getrandbits(4)
     _last_ts = None
     _sequence = 0
@@ -69,6 +69,8 @@ class ObjectId(object):
         sequence = oid & SEQUENCE_MASK
         if last_ts <= 0:
             raise ValueError('非法 id；时间逆流。')
+        if service_code < SERVICE_CODE_MIN:
+            raise ValueError('非法 service code：%s。' % (str(service_code),))
         return service_code, last_ts, pid_code, sequence
 
     @classmethod
@@ -191,7 +193,7 @@ class DataDictionaryId(object):
             else:
                 if 'dd_type' in kwargs and 'service_code' in kwargs:
                     dd_type = kwargs['dd_type']
-                    if isinstance(dd_type, str):
+                    if isinstance(dd_type, str) and dd_type in DD_TYPE:
                         dd_type = int(dd_type, 16)
                     oid = ObjectId(service_code=kwargs['service_code'])
                     self._id = DataDictionaryId.pack(dd_type, oid.value)
@@ -225,7 +227,7 @@ class DataDictionaryId(object):
                 raise TypeError("ddid 应为17位长度的字符串，或者是 DataDictionaryId 实例。")
         dd_type = ddid_value >> DD_TYPE_BITS_SHIFT
         oid = ddid_value & OID_MASK
-        if ObjectId.validate(oid) and hex_str(dd_type, 1) in DD_TYPE.values():
+        if ObjectId.validate(oid) and hex_str(dd_type, 1) in DD_TYPE:
             return dd_type, oid
         else:
             raise ValueError('异常：非法 ddid。')
@@ -295,19 +297,28 @@ class DBConnector(object):
         if fields is None:
             sql = sql + '* from ' + table_name
         else:
-            sql = sql + ', '.join(fields) + table_name
+            sql = sql + ', '.join(fields) + ' from ' + table_name
         if condition is not None:
             sql = sql + 'WHERE ' + condition
         print(sql)
         return cx.read_sql(DBConnector._db_url, sql)
 
     @staticmethod
-    def get_cursor():
+    def connect():
         if DBConnector._connection is None:
             db_path = DBConnector._db_url.split('://')[1]
             DBConnector._connection = sqlite3.connect(db_path)
+
+    @staticmethod
+    def get_cursor():
+        DBConnector.connect()
         cursor = DBConnector._connection.cursor()
         return cursor
+
+    @staticmethod
+    def commit():
+        DBConnector.connect()
+        DBConnector._connection.commit()
 
     @staticmethod
     def disconnect():
@@ -334,6 +345,7 @@ class DBConnector(object):
             sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields_def) + ")"
             print(sql)
             cursor.execute(sql)
+            DBConnector.commit()
             cursor.close()
 
     @staticmethod
@@ -342,11 +354,13 @@ class DBConnector(object):
         with open(filename, 'r') as fin:
             dr = csv.DictReader(fin)
             to_db = [tuple([row[field] for field in dr.fieldnames]) for row in dr]
-            sql = 'INSERT INTO ' + table_name + ' ' + str(tuple(dr.fieldnames)) + ' VALUES (' + ', '.join(list('?' * len(dr.fieldnames))) + ');'
+            print(to_db)
+            sql = 'INSERT INTO ' + table_name + ' ' + str(tuple(dr.fieldnames)).replace("'", '') + ' VALUES (' + ', '.join(list('?' * len(dr.fieldnames))) + ');'
             print(sql)
             # sql = 'INSERT INTO ' + table_name + ' (' + ''.join(dr.fieldnames) + ') VALUES (' + ', '.join(
             #     list('?' * len(dr.fieldnames))) + ');'
             cursor.executemany(sql, to_db)
+            DBConnector.commit()
         cursor.close()
 
     @staticmethod
@@ -363,14 +377,14 @@ class DBConnector(object):
                     else:
                         return 'tdu' + service_id + '_' + owner_id
         else:
-            raise ValueError('table_type 应为 (%s)' % (TABLE_TYPE,))
+            raise ValueError('table_type 应为 (%s)。' % (TABLE_TYPE,))
 
     @staticmethod
     def get_dd(service_id: str, dd_type: str):
         if dd_type in DD_TYPE:
             table_name = DBConnector.get_table_name(service_id, TABLE_TYPE_DD)
             dd = DBConnector.query(table_name)
-            return dd[dd['ddid'].str[0] == DD_TYPE[dd_type]]
+            return dd[dd['ddid'].str[0] == dd_type]
         else:
             raise ValueError('异常：未能识别的 dd_type "%s".' % (dd_type,))
 
@@ -415,7 +429,7 @@ class DataUnitProcessor(object):
 
 
 class DataUnitService(object):
-    __slots__ = ('_dd', '_config',)
+    __slots__ = ('_dd', '_config', '_sdu')
 
     def __init__(self, settings, init_flag=False):
         self._config = config({
@@ -491,10 +505,11 @@ class DataUnitService(object):
             if key in self._config:
                 self._config[key] = value
         self._dd = None
+        self._sdu = None
         if init_flag:
             self.init_tables()
         else:
-            self.load_dd()
+            self._load_dd()
         # TODO
         # TDU?SDU?初始化？
         # 直接load数据初始化的处理后续要考虑
@@ -507,20 +522,23 @@ class DataUnitService(object):
     def service_code(self):
         return int(self.service_id, 8)
 
+    def _get_attribute(self, dd_type):
+        data = self._dd[self._dd['ddid'].str[0] == dd_type]
+        res = data['ddid'].str[1:].tolist()
+        res.sort()
+        return res
+
     @property
     def owners(self):
-        data = self._dd[self._dd['ddid'].str[0] == DD_TYPE[DD_TYPE_OWNER]]
-        return data['ddid']
+        return self._get_attribute(DD_TYPE_OWNER)
 
     @property
     def metrics(self):
-        data = self._dd[self._dd['ddid'].str[0] == DD_TYPE[DD_TYPE_METRIC]]
-        return data['ddid']
+        return self._get_attribute(DD_TYPE_METRIC)
 
     @property
     def tags(self):
-        data = self._dd[self._dd['ddid'].str[0] == DD_TYPE[DD_TYPE_TAG]]
-        return data['ddid']
+        return self._get_attribute(DD_TYPE_TAG)
 
     def disc(self, ddid: str = None, dd_type: str = None, oid: str = None):
         data = self._dd
@@ -532,16 +550,21 @@ class DataUnitService(object):
                     data = self._dd[self._dd['ddid'].str[1:] == oid]
             else:
                 if oid is None:
-                    data = self._dd[self._dd['ddid'].str[0] == DD_TYPE[dd_type]]
+                    data = self._dd[self._dd['ddid'].str[0] == dd_type]
                 else:
-                    ddid_val = DD_TYPE[dd_type] + oid
+                    ddid_val = dd_type + oid
                     data = self._dd[self._dd['ddid'] == ddid_val]
         else:
             data = self._dd[self._dd['ddid'] == ddid]
-        return data['disc'].values.tolist().sort()
+        res = data['disc'].values.tolist()
+        res.sort()
+        return res
 
-    def load_dd(self):
+    def _load_dd(self):
         self._dd = DBConnector.query(self._get_table_name(TABLE_TYPE_DD))
+
+    def _init_sdu(self):
+        self._sdu = SpaceDataUnit(self.service_id)
 
     def _get_table_name(self, table_type: str, owner_id: str = None):
         return DBConnector.get_table_name(self.service_id, table_type, owner_id)
@@ -556,15 +579,15 @@ class DataUnitService(object):
         tag_mappings = {}
         tag_value_mappings = {}
         for owner in self._config['owners']:
-            owner_ddid = DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_OWNER], service_code=self.service_code)
+            owner_ddid = DataDictionaryId(dd_type=DD_TYPE_OWNER, service_code=self.service_code)
             owner_mappings[owner] = owner_ddid.oid
             line = str(owner_ddid) + ',' + owner + ','
             ddid_content.append(line)
         for metric in self._config['metrics']:
-            line = str(DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_METRIC], service_code=self.service_code)) + ',' + metric + ','
+            line = str(DataDictionaryId(dd_type=DD_TYPE_METRIC, service_code=self.service_code)) + ',' + metric + ','
             ddid_content.append(line)
         for tag in self._config['tags']:
-            tag_ddid = DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_TAG], service_code=self.service_code)
+            tag_ddid = DataDictionaryId(dd_type=DD_TYPE_TAG, service_code=self.service_code)
             tag_oid = tag_ddid.oid
             tag_mappings[tag['name']] = tag_ddid.oid
             line = str(tag_ddid) + ',' + tag['name'] + ','
@@ -575,7 +598,7 @@ class DataUnitService(object):
                 mask_bit = mask_bit + 1
                 mask = -1 ^ (-1 << mask_bit)
                 mask_str = tag_oid + hex_str(mask_bit, 16)
-                line = str(DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_TAG_VALUE], service_code=self.service_code)) + ',' + tag_value['disc'] + ',' + mask_str
+                line = str(DataDictionaryId(dd_type=DD_TYPE_TAG_VALUE, service_code=self.service_code)) + ',' + tag_value['disc'] + ',' + mask_str
                 ddid_content.append(line)
                 for owner in tag_value['owners']:
                     if owner in tag_value_mappings[tag_oid]:
@@ -586,11 +609,13 @@ class DataUnitService(object):
         DataUnitService.write_file(dd_filename, DD_HEADERS, ddid_content)
         # 导入数据到数据库表
         DBConnector.import_data(dd_filename, dd_table_name)
-        self.load_dd()
+        # 初始化_dd
+        self._load_dd()
         # 建立SDU数据表
         sdu_table_name = self._get_table_name(TABLE_TYPE_SDU)
         sdu_fields = {'owner': 'VARCHAR(16)'}
         for tag in self.tags:
+            print(tag)
             sdu_fields[tag] = 'INT'
         DBConnector.init_table(sdu_table_name, sdu_fields)
         # 初始化SDU数据
@@ -607,6 +632,10 @@ class DataUnitService(object):
                 sdu_content[owner_oid][tag_oid] = tag_value
         sdu_filename = self._get_filename(FILE_TYPE_SDU)
         DataUnitService.write_file(sdu_filename, sdu_headers, sdu_content)
+        # 导入数据到数据库表
+        DBConnector.import_data(sdu_filename, sdu_table_name)
+        # 初始化_sdu
+        self._init_sdu()
         # 建立TDU数据表
         tdu_fields = {'timestamp': 'VARCHAR(16)'}  # String of Unix Millisecond Timestamp
         for metric in self.metrics:
@@ -685,7 +714,7 @@ class TimeDataUnit(DataUnit):
 
 
 class SpaceDataUnit(DataUnit):
-    def __init__(self, service_id, tag_definition_raw=None):
+    def __init__(self, service_id):
         super().__init__()
         dd_tag = DBConnector.get_dd(service_id, DD_TYPE_TAG)
         dd_tag_value = DBConnector.get_dd(service_id, DD_TYPE_TAG_VALUE)
@@ -698,4 +727,3 @@ class SpaceDataUnit(DataUnit):
             tag_oid = row['oid_mask'][:16]
             tag_value_mask = row['oid_mask'][16:]
             self._tag_definition[tag_oid][tag_value_oid] = tag_value_mask
-

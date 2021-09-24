@@ -5,12 +5,12 @@ from mts.const import *
 
 class TestDataDictionaryId(unittest.TestCase):
     def test_default(self):
-        a = DataDictionaryId(ddid='2000548d4e5abb001')
-        self.assertEqual(a.oid, '000548d4e5abb001')
-        self.assertEqual(a.dd_type, DD_TYPE[DD_TYPE_METRIC])
-        b = DataDictionaryId(dd_type=DD_TYPE[DD_TYPE_OWNER], oid=int('000548d4e5abb002', 16))
-        self.assertEqual(b.oid, '000548d4e5abb002')
-        self.assertEqual(b.dd_type, DD_TYPE[DD_TYPE_OWNER])
+        a = DataDictionaryId(ddid='2a00548d4e5abb001')
+        self.assertEqual(a.oid, 'a00548d4e5abb001')
+        self.assertEqual(a.dd_type, DD_TYPE_METRIC)
+        b = DataDictionaryId(dd_type=DD_TYPE_OWNER, oid=int('a00548d4e5abb002', 16))
+        self.assertEqual(b.oid, 'a00548d4e5abb002')
+        self.assertEqual(b.dd_type, DD_TYPE_OWNER)
         print(a.__repr__())
         print(b.__repr__())
 

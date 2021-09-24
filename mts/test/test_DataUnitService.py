@@ -7,7 +7,7 @@ from mts.const import *
 class TestDataUnitService(unittest.TestCase):
     def test_constructor(self):
         settings = {
-            'service_id': '01',
+            'service_id': '51',
             'ds_path': os.path.join('resources', 'ds'),
             'owners': ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉'],
             'metrics': ['进货量/斤', '销量/斤'],
@@ -36,7 +36,21 @@ class TestDataUnitService(unittest.TestCase):
         print(db_url)
         DBConnector.register(db_url)
         ds = DataUnitService(settings, True)
-        self.assertEqual(ds.disc(dd_type=DD_TYPE_METRIC), settings['metrics'].sort())
+        tags = []
+        owners = settings['owners']
+        owners.sort()
+        self.assertEqual(ds.disc(dd_type=DD_TYPE_OWNER), owners)
+        metrics = settings['metrics']
+        metrics.sort()
+        self.assertEqual(ds.disc(dd_type=DD_TYPE_METRIC), metrics)
+        for tag in settings['tags']:
+            tags.append(tag['name'])
+        tags.sort()
+        self.assertEqual(ds.disc(dd_type=DD_TYPE_TAG), tags)
+        sdu_table_name = DBConnector.get_table_name(ds.service_id, TABLE_TYPE_SDU)
+        owner_ids = DBConnector.query(sdu_table_name, ['owner'])['owner'].tolist()
+        owner_ids.sort()
+        self.assertEqual(ds.owners, owner_ids)
 
 
 if __name__ == '__main__':
