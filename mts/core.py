@@ -507,9 +507,16 @@ class DataUnitService(object):
         self._dd = None
         self._sdu = None
         if init_flag:
-            self.init_tables()
+            if self._config.is_default() or self._config.is_default('service_id') or self._config.is_default('ds_path'):
+                raise ValueError('DataUnitService 配置参数错误。')
+            else:
+                self.init_tables()
         else:
-            self._load_dd()
+            if self._config.is_default('service_id') or self._config.is_default('ds_path'):
+                raise ValueError('请检查 DataUnitService 配置参数 service_id 和 ds_path，不能使用默认值进行初始化处理。')
+            else:
+                self._load_dd()
+                self._init_sdu()
         # TODO
         # TDU?SDU?初始化？
         # 直接load数据初始化的处理后续要考虑

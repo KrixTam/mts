@@ -5,10 +5,10 @@ from mts.const import *
 
 
 class TestDataUnitService(unittest.TestCase):
-    def test_constructor(self):
+    def test_constructor_01(self):
         settings = {
             'service_id': '51',
-            'ds_path': os.path.join('resources', 'ds'),
+            'ds_path': os.path.join('output'),
             'owners': ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉'],
             'metrics': ['进货量/斤', '销量/斤'],
             'tags': [
@@ -45,6 +45,28 @@ class TestDataUnitService(unittest.TestCase):
         self.assertEqual(ds.disc(dd_type=DD_TYPE_METRIC), metrics)
         for tag in settings['tags']:
             tags.append(tag['name'])
+        tags.sort()
+        self.assertEqual(ds.disc(dd_type=DD_TYPE_TAG), tags)
+        sdu_table_name = DBConnector.get_table_name(ds.service_id, TABLE_TYPE_SDU)
+        owner_ids = DBConnector.query(sdu_table_name, ['owner'])['owner'].tolist()
+        owner_ids.sort()
+        self.assertEqual(ds.owners, owner_ids)
+
+    def test_constructor_02(self):
+        settings = {
+            'service_id': '51',
+            'ds_path': os.path.join('resources', 'ds')
+        }
+        db_url = 'sqlite://' + os.path.join(os.getcwd(), 'output', 'mtsdb')
+        DBConnector.register(db_url)
+        ds = DataUnitService(settings)
+        owners = ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉']
+        owners.sort()
+        self.assertEqual(ds.disc(dd_type=DD_TYPE_OWNER), owners)
+        metrics = ['进货量/斤', '销量/斤']
+        metrics.sort()
+        self.assertEqual(ds.disc(dd_type=DD_TYPE_METRIC), metrics)
+        tags = ['颜色', '货源']
         tags.sort()
         self.assertEqual(ds.disc(dd_type=DD_TYPE_TAG), tags)
         sdu_table_name = DBConnector.get_table_name(ds.service_id, TABLE_TYPE_SDU)
