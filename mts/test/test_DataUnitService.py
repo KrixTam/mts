@@ -57,7 +57,7 @@ class TestDataUnitService(unittest.TestCase):
             'service_id': '51',
             'ds_path': os.path.join('resources', 'ds')
         }
-        db_url = 'sqlite://' + os.path.join(os.getcwd(), 'output', 'mtsdb')
+        db_url = 'sqlite://' + os.path.join(os.getcwd(), 'resources', 'ds', 'mtsdb')
         DBConnector.register(db_url)
         ds = DataUnitService(settings)
         owners = ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉']
