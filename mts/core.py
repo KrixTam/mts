@@ -438,6 +438,7 @@ class DataUnitService(object):
                 'service_id': '00',
                 'version': 0,
                 'ds_path': 'ds',
+                'bak_path': 'bak',
                 'owners': ['owner_01'],
                 'metrics': ['metric_01'],
                 'tags': [
@@ -464,6 +465,7 @@ class DataUnitService(object):
                         'minimum': 0
                     },
                     'ds_path': {'type': 'string'},
+                    'bak_path': {'type': 'string'},
                     'owners': {
                         'type': 'array',
                         'items': {'type': 'string'},
@@ -506,6 +508,8 @@ class DataUnitService(object):
                 self._config[key] = value
         self._dd = None
         self._sdu = None
+        if self._config.is_default('bak_path'):
+            self._config['bak_path'] = path.join(self._config['ds_path'], 'bak')
         if init_flag:
             if self._config.is_default() or self._config.is_default('service_id') or self._config.is_default('ds_path'):
                 raise ValueError('DataUnitService 配置参数错误。')
@@ -517,9 +521,8 @@ class DataUnitService(object):
             else:
                 self._load_dd()
                 self._init_sdu()
-        # TODO
-        # TDU?SDU?初始化？
-        # 直接load数据初始化的处理后续要考虑
+                # TODO：待验证
+                self._init_tdu()
 
     @property
     def service_id(self):
@@ -573,6 +576,10 @@ class DataUnitService(object):
     def _init_sdu(self):
         self._sdu = SpaceDataUnit(self.service_id)
 
+    def _init_tdu(self):
+        # TODO：初始化TDU
+        pass
+
     def _get_table_name(self, table_type: str, owner_id: str = None):
         return DBConnector.get_table_name(self.service_id, table_type, owner_id)
 
@@ -583,6 +590,7 @@ class DataUnitService(object):
         # 初始化ddid数据
         ddid_content = []
         owner_mappings = {}
+        metric_mappings = {}
         tag_mappings = {}
         tag_value_mappings = {}
         for owner in self._config['owners']:
@@ -591,7 +599,9 @@ class DataUnitService(object):
             line = str(owner_ddid) + ',' + owner + ','
             ddid_content.append(line)
         for metric in self._config['metrics']:
-            line = str(DataDictionaryId(dd_type=DD_TYPE_METRIC, service_code=self.service_code)) + ',' + metric + ','
+            metric_ddid = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_code=self.service_code)
+            metric_mappings[metric] = metric_ddid.oid
+            line = str(metric_ddid) + ',' + metric + ','
             ddid_content.append(line)
         for tag in self._config['tags']:
             tag_ddid = DataDictionaryId(dd_type=DD_TYPE_TAG, service_code=self.service_code)
@@ -647,29 +657,45 @@ class DataUnitService(object):
         tdu_fields = {'timestamp': 'VARCHAR(16)'}  # String of Unix Millisecond Timestamp
         for metric in self.metrics:
             tdu_fields[metric] = 'VARCHAR(16)'
-        for owner in self.owners:
-            tdu_table_name = self._get_table_name(TABLE_TYPE_TDU, owner)
+        for owner_disc, owner_oid in owner_mappings.items():
+            tdu_table_name = self._get_table_name(TABLE_TYPE_TDU, owner_oid)
             DBConnector.init_table(tdu_table_name, tdu_fields)
-        # TODO
-        # 初始化TDU数据
+            raw_data = self._read_tdu_raw_data(owner_disc)
+            raw_data.rename(columns=metric_mappings, inplace=True)
+            raw_data['timestamp'] = raw_data['timestamp'].apply(lambda x: moment(x).format('YYYYMMDD HHmmss.SSS ZZ')).astype('string')
+            # pd.to_datetime(raw_data['timestamp'])
+            tdu_filename = self._get_filename(FILE_TYPE_TDU, owner_oid)
+            DataUnitService.write_file(tdu_filename, None, raw_data)
+            # 导入数据到数据库表
+            DBConnector.import_data(tdu_filename, tdu_table_name)
+        # TODO：待验证
+        self._init_tdu()
+
+    def _read_tdu_raw_data(self, owner):
+        filename = path.join(self._config['ds_path'], owner + FILE_EXT[FILE_TYPE_TDU_RAW])
+        data = pd.read_csv(filename, dtype=str)
+        return data
 
     def _get_filename(self, file_type, *args):
         if file_type in FILE_EXT:
             if file_type == FILE_TYPE_DD or file_type == FILE_TYPE_SDU:
-                return path.join(self._config['ds_path'], self.service_id + FILE_EXT[file_type])
+                return path.join(self._config['bak_path'], self.service_id + FILE_EXT[file_type])
             else:
-                if isinstance(args[0], list):
-                    filenames = []
-                    for owner_id in args[0]:
-                        filenames.append(path.join(self._config['ds_path'], self.service_id + '_' + owner_id + FILE_EXT[file_type]))
-                    return filenames
-                else:
-                    if isinstance(args[0], str):
-                        return path.join(self._config['ds_path'], self.service_id + '_' + args[0] + FILE_EXT[file_type])
+                if file_type == FILE_TYPE_TDU:
+                    if isinstance(args[0], list):
+                        filenames = []
+                        for owner_id in args[0]:
+                            filenames.append(path.join(self._config['bak_path'], self.service_id + '_' + owner_id + FILE_EXT[file_type]))
+                        return filenames
                     else:
-                        raise TypeError('文件类型 "%s" 后必须跟有一个值为 owner id 的参数，或者一个存储着一系列 owner id 的 list' % (file_type,))
+                        if isinstance(args[0], str):
+                            return path.join(self._config['bak_path'], self.service_id + '_' + args[0] + FILE_EXT[file_type])
+                        else:
+                            raise TypeError('文件类型 "%s" 后必须跟有一个值为 owner id 的参数，或者一个存储着一系列 owner id 的 list。' % (file_type,))
+                else:
+                    raise ValueError('暂不支持该 file_type，获取文件名失败。')
         else:
-            raise ValueError('并非预先定义的 file_type，获取文件名失败')
+            raise ValueError('并非预先定义的 file_type，获取文件名失败。')
 
     def import_data(self, file_type, table_name, *args):
         filename = self._get_filename(file_type, *args)
@@ -680,35 +706,38 @@ class DataUnitService(object):
 
     @staticmethod
     def write_file(output_filename, headers, content):
-        with open(output_filename, 'w', newline='') as file_handler:
-            if isinstance(content, list):
-                if isinstance(headers, str):
-                    if len(headers) > 0:
-                        file_handler.write(headers + '\n')
-                else:
-                    if isinstance(headers, list):
-                        file_handler.write(','.join(headers) + '\n')
+        if headers is None and isinstance(content, pd.DataFrame):
+            content.to_csv(output_filename, index=False)
+        else:
+            with open(output_filename, 'w', newline='') as file_handler:
+                if isinstance(content, list):
+                    if isinstance(headers, str):
+                        if len(headers) > 0:
+                            file_handler.write(headers + '\n')
                     else:
-                        raise TypeError('headers 的类型必须为包含","的字符串或字符串list')
-                for line in content:
-                    file_handler.write(line + '\n')
-            else:
-                if isinstance(content, dict):
-                    if isinstance(headers, list):
-                        writer = csv.DictWriter(file_handler, fieldnames=headers)
-                        writer.writeheader()
-                        first_field = headers[0]
-                        other_fields = headers.copy()
-                        del other_fields[0]
-                        for first_field_value, items in content.items():
-                            line = {first_field: first_field_value}
-                            for field in other_fields:
-                                line[field] = items[field]
-                            writer.writerow(line)
-                    else:
-                        raise TypeError('当 content 为 dict 时，headers必须为字符串的 list')
+                        if isinstance(headers, list):
+                            file_handler.write(','.join(headers) + '\n')
+                        else:
+                            raise TypeError('headers 的类型必须为包含","的字符串或字符串list')
+                    for line in content:
+                        file_handler.write(line + '\n')
                 else:
-                    raise TypeError('content 的类型必须为 list 或 dict')
+                    if isinstance(content, dict):
+                        if isinstance(headers, list):
+                            writer = csv.DictWriter(file_handler, fieldnames=headers)
+                            writer.writeheader()
+                            first_field = headers[0]
+                            other_fields = headers.copy()
+                            del other_fields[0]
+                            for first_field_value, items in content.items():
+                                line = {first_field: first_field_value}
+                                for field in other_fields:
+                                    line[field] = items[field]
+                                writer.writerow(line)
+                        else:
+                            raise TypeError('当 content 为 dict 时，headers必须为字符串的 list')
+                    else:
+                        raise TypeError('content 的类型必须为 list 或 dict')
 
 
 class DataUnit(object):

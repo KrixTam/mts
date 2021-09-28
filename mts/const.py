@@ -46,6 +46,7 @@ DD_HEADERS = 'ddid,disc,oid_mask'
 FILE_TYPE_DD = 'dd'
 FILE_TYPE_SDU = 'sdu'
 FILE_TYPE_TDU = 'tdu'
+FILE_TYPE_TDU_RAW = 'rtdu'
 
 TABLE_TYPE_DD = 'dd'
 TABLE_TYPE_SDU = 'sdu'
@@ -56,7 +57,8 @@ TABLE_TYPE = [TABLE_TYPE_DD, TABLE_TYPE_SDU, TABLE_TYPE_TDU]
 FILE_EXT = {
     FILE_TYPE_DD: '.dd',
     FILE_TYPE_SDU: '.sdu',
-    FILE_TYPE_TDU: '.tdu'
+    FILE_TYPE_TDU: '.tdu',
+    FILE_TYPE_TDU_RAW: '.rtdu'
 }
 
 FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR(32)'}

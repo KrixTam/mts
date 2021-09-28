@@ -8,7 +8,8 @@ class TestDataUnitService(unittest.TestCase):
     def test_constructor_01(self):
         settings = {
             'service_id': '51',
-            'ds_path': os.path.join('output'),
+            'ds_path': os.path.join('resources', 'ds'),
+            'bak_path': os.path.join('output'),
             'owners': ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉'],
             'metrics': ['进货量/斤', '销量/斤'],
             'tags': [
