@@ -48,8 +48,7 @@ class TestDataUnitService(unittest.TestCase):
             tags.append(tag['name'])
         tags.sort()
         self.assertEqual(ds.disc(dd_type=DD_TYPE_TAG), tags)
-        sdu_table_name = DBConnector.get_table_name(ds.service_id, TABLE_TYPE_SDU)
-        owner_ids = DBConnector.query(sdu_table_name, ['owner'])['owner'].tolist()
+        owner_ids = DBConnector.query(ds.service_id, TABLE_TYPE_SDU, ['owner'])['owner'].tolist()
         owner_ids.sort()
         self.assertEqual(ds.owners, owner_ids)
 
@@ -70,8 +69,7 @@ class TestDataUnitService(unittest.TestCase):
         tags = ['颜色', '货源']
         tags.sort()
         self.assertEqual(ds.disc(dd_type=DD_TYPE_TAG), tags)
-        sdu_table_name = DBConnector.get_table_name(ds.service_id, TABLE_TYPE_SDU)
-        owner_ids = DBConnector.query(sdu_table_name, ['owner'])['owner'].tolist()
+        owner_ids = DBConnector.query(ds.service_id, TABLE_TYPE_SDU, ['owner'])['owner'].tolist()
         owner_ids.sort()
         self.assertEqual(ds.owners, owner_ids)
 

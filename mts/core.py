@@ -1,15 +1,16 @@
-# coding: utf-8
-
 import csv
 import sqlite3
+from abc import abstractmethod
 from os import path, getpid
-from config import config
+from ni.config import Config
 import connectorx as cx
 import threading
 import logging
 from moment import moment
 from random import getrandbits
 import pandas as pd
+from cachetools import TTLCache
+from datetime import datetime
 from mts.const import *
 
 
@@ -292,7 +293,8 @@ class DBConnector(object):
         DBConnector._db_url = db_url
 
     @staticmethod
-    def query(table_name, fields: list = None, condition: str = None):
+    def query(service_id: str, table_type: str, fields: list = None, condition: str = None, owner_id: str = None):
+        table_name = DBConnector.get_table_name(service_id, table_type, owner_id)
         sql = 'SELECT '
         if fields is None:
             sql = sql + '* from ' + table_name
@@ -382,8 +384,7 @@ class DBConnector(object):
     @staticmethod
     def get_dd(service_id: str, dd_type: str):
         if dd_type in DD_TYPE:
-            table_name = DBConnector.get_table_name(service_id, TABLE_TYPE_DD)
-            dd = DBConnector.query(table_name)
+            dd = DBConnector.query(service_id, TABLE_TYPE_DD)
             return dd[dd['ddid'].str[0] == dd_type]
         else:
             raise ValueError('异常：未能识别的 dd_type "%s".' % (dd_type,))
@@ -391,7 +392,7 @@ class DBConnector(object):
 
 class DataUnitProcessor(object):
     def __init__(self, settings):
-        self._config = config({
+        self._config = Config({
             'name': 'DataUnitProcessor',
             'default': {
                 'db': 'sqlite:///path/to/db'
@@ -429,10 +430,10 @@ class DataUnitProcessor(object):
 
 
 class DataUnitService(object):
-    __slots__ = ('_dd', '_config', '_sdu')
+    __slots__ = ('_dd', '_config', '_sdu', '_tdu')
 
     def __init__(self, settings, init_flag=False):
-        self._config = config({
+        self._config = Config({
             'name': 'DataUnitService',
             'default': {
                 'service_id': '00',
@@ -508,6 +509,7 @@ class DataUnitService(object):
                 self._config[key] = value
         self._dd = None
         self._sdu = None
+        self._tdu = None
         if self._config.is_default('bak_path'):
             self._config['bak_path'] = path.join(self._config['ds_path'], 'bak')
         if init_flag:
@@ -540,15 +542,15 @@ class DataUnitService(object):
 
     @property
     def owners(self):
-        return self._get_attribute(DD_TYPE_OWNER)
+        return self._tdu.owners
 
     @property
     def metrics(self):
-        return self._get_attribute(DD_TYPE_METRIC)
+        return self._tdu.metrics
 
     @property
     def tags(self):
-        return self._get_attribute(DD_TYPE_TAG)
+        return self._sdu.tags
 
     def disc(self, ddid: str = None, dd_type: str = None, oid: str = None):
         data = self._dd
@@ -571,14 +573,14 @@ class DataUnitService(object):
         return res
 
     def _load_dd(self):
-        self._dd = DBConnector.query(self._get_table_name(TABLE_TYPE_DD))
+        self._dd = DBConnector.query(self.service_id, TABLE_TYPE_DD)
 
     def _init_sdu(self):
         self._sdu = SpaceDataUnit(self.service_id)
 
     def _init_tdu(self):
         # TODO：初始化TDU
-        pass
+        self._tdu = TDUProcessor(self.service_id)
 
     def _get_table_name(self, table_type: str, owner_id: str = None):
         return DBConnector.get_table_name(self.service_id, table_type, owner_id)
@@ -631,7 +633,8 @@ class DataUnitService(object):
         # 建立SDU数据表
         sdu_table_name = self._get_table_name(TABLE_TYPE_SDU)
         sdu_fields = {'owner': 'VARCHAR(16)'}
-        for tag in self.tags:
+        tags = self._get_attribute(DD_TYPE_TAG)
+        for tag in tags:
             print(tag)
             sdu_fields[tag] = 'INT'
         DBConnector.init_table(sdu_table_name, sdu_fields)
@@ -655,7 +658,8 @@ class DataUnitService(object):
         self._init_sdu()
         # 建立TDU数据表
         tdu_fields = {'timestamp': 'VARCHAR(16)'}  # String of Unix Millisecond Timestamp
-        for metric in self.metrics:
+        metrics = self._get_attribute(DD_TYPE_METRIC)
+        for metric in metrics:
             tdu_fields[metric] = 'VARCHAR(16)'
         for owner_disc, owner_oid in owner_mappings.items():
             tdu_table_name = self._get_table_name(TABLE_TYPE_TDU, owner_oid)
@@ -740,26 +744,74 @@ class DataUnitService(object):
                         raise TypeError('content 的类型必须为 list 或 dict')
 
 
+class TDUProcessor(object):
+    __slots__ = ('_tdus', '_owners', '_metrics')
+
+    def __init__(self, service_id, cache_size=CACHE_MAX_SIZE_DEFAULT, time_to_live=CACHE_TTL_DEFAULT):
+        dd_owners = DBConnector.get_dd(service_id, DD_TYPE_OWNER)
+        dd_metrics = DBConnector.get_dd(service_id, DD_TYPE_METRIC)
+        self._tdus = TTLCache(maxsize=cache_size, ttl=time_to_live, timer=datetime.now)
+        self._owners = dd_owners['ddid'].str[1:].tolist()
+        self._owners.sort()
+        self._metrics = dd_metrics['ddid'].str[1:].tolist()
+        self._metrics.sort()
+
+    @property
+    def owners(self):
+        return self._owners
+
+    @property
+    def metrics(self):
+        return self._metrics
+
+
 class DataUnit(object):
-    pass
+
+    def __init__(self, service_id):
+        self._service_id = service_id
+
+    @property
+    def service_id(self):
+        return self._service_id
+
+    @abstractmethod
+    def query(self, include: dict = None, exclude: dict = None, scope: list = None):
+        pass
 
 
 class TimeDataUnit(DataUnit):
-    def __init__(self, owners, metrics):
-        super().__init__()
+
+    def __init__(self, service_id, owner_id, tdu_processor):
+        super().__init__(service_id)
+        self._owner_id = owner_id
+        self._processor = tdu_processor
+
+    def query(self, include: dict = None, exclude: dict = None, scope: list = None):
+        pass
 
 
 class SpaceDataUnit(DataUnit):
+
     def __init__(self, service_id):
-        super().__init__()
+        super().__init__(service_id)
         dd_tag = DBConnector.get_dd(service_id, DD_TYPE_TAG)
         dd_tag_value = DBConnector.get_dd(service_id, DD_TYPE_TAG_VALUE)
+        self._tags = []
         self._tag_definition = {}
         for index, row in dd_tag.iterrows():
             tag_oid = row['ddid'][1:]
             self._tag_definition[tag_oid] = {}
+            self._tags.append(tag_oid)
         for index, row in dd_tag_value.iterrows():
             tag_value_oid = row['ddid'][1:]
             tag_oid = row['oid_mask'][:16]
             tag_value_mask = row['oid_mask'][16:]
             self._tag_definition[tag_oid][tag_value_oid] = tag_value_mask
+        self._tags.sort()
+
+    @property
+    def tags(self):
+        return self._tags
+
+    def query(self, include: dict = None, exclude: dict = None, scope: list = None):
+        pass
