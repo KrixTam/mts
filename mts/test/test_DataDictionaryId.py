@@ -1,6 +1,7 @@
 import unittest
 from mts.const import *
 from mts.core import DataDictionaryId
+from mts.utils import logger
 
 
 class TestDataDictionaryId(unittest.TestCase):
@@ -11,8 +12,8 @@ class TestDataDictionaryId(unittest.TestCase):
         b = DataDictionaryId(dd_type=DD_TYPE_OWNER, oid=int('a00548d4e5abb002', 16))
         self.assertEqual(b.oid, 'a00548d4e5abb002')
         self.assertEqual(b.dd_type, DD_TYPE_OWNER)
-        print(a.__repr__())
-        print(b.__repr__())
+        logger.log(a.__repr__())
+        logger.log(b.__repr__())
 
     def test_TypeError(self):
         try:

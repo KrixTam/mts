@@ -302,7 +302,8 @@ class DBConnector(object):
             sql = sql + ', '.join(fields) + ' from ' + table_name
         if condition is not None:
             sql = sql + 'WHERE ' + condition
-        print(sql)
+        # TODO：待删除的临时打印信息
+        logger.log(sql)
         return cx.read_sql(DBConnector._db_url, sql)
 
     @staticmethod
@@ -345,7 +346,8 @@ class DBConnector(object):
             for key, value in fields.items():
                 fields_def.append('[' + key + '] ' + value)
             sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields_def) + ")"
-            print(sql)
+            # TODO：待删除的临时打印信息
+            logger.log(sql)
             cursor.execute(sql)
             DBConnector.commit()
             cursor.close()
@@ -356,9 +358,11 @@ class DBConnector(object):
         with open(filename, 'r') as fin:
             dr = csv.DictReader(fin)
             to_db = [tuple([row[field] for field in dr.fieldnames]) for row in dr]
-            print(to_db)
+            # TODO：待删除的临时打印信息
+            logger.log(to_db)
             sql = 'INSERT INTO ' + table_name + ' ' + str(tuple(dr.fieldnames)).replace("'", '') + ' VALUES (' + ', '.join(list('?' * len(dr.fieldnames))) + ');'
-            print(sql)
+            # TODO：待删除的临时打印信息
+            logger.log(sql)
             # sql = 'INSERT INTO ' + table_name + ' (' + ''.join(dr.fieldnames) + ') VALUES (' + ', '.join(
             #     list('?' * len(dr.fieldnames))) + ');'
             cursor.executemany(sql, to_db)
@@ -635,7 +639,8 @@ class DataUnitService(object):
         sdu_fields = {'owner': 'VARCHAR(16)'}
         tags = self._get_attribute(DD_TYPE_TAG)
         for tag in tags:
-            print(tag)
+            # TODO：待删除的临时打印信息
+            logger.log(tag)
             sdu_fields[tag] = 'INT'
         DBConnector.init_table(sdu_table_name, sdu_fields)
         # 初始化SDU数据

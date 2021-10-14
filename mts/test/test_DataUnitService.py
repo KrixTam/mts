@@ -2,6 +2,7 @@ import os
 import unittest
 from mts.const import *
 from mts.core import DataUnitService, DBConnector
+from mts.utils import logger
 
 
 class TestDataUnitService(unittest.TestCase):
@@ -34,7 +35,7 @@ class TestDataUnitService(unittest.TestCase):
             ]
         }
         db_url = 'sqlite://' + os.path.join(os.getcwd(), 'output', 'mtsdb')
-        print(db_url)
+        logger.log(db_url)
         DBConnector.register(db_url)
         ds = DataUnitService(settings, True)
         tags = []

@@ -1,5 +1,6 @@
 import unittest
 from mts.core import ObjectId
+from mts.utils import logger
 
 
 class TestObjectId(unittest.TestCase):
@@ -23,10 +24,10 @@ class TestObjectId(unittest.TestCase):
         self.assertNotEqual(a.__repr__().split('\n')[1], c.__repr__().split('\n')[1])
         self.assertEqual(a.__repr__().split('\n')[1], d.__repr__().split('\n')[1])
         b = ObjectId(a)
-        print(a.__repr__())
-        print(b.__repr__())
-        print(c.__repr__())
-        print(d.__repr__())
+        logger.log(a.__repr__())
+        logger.log(b.__repr__())
+        logger.log(c.__repr__())
+        logger.log(d.__repr__())
         self.assertTrue(a == b)
 
 
