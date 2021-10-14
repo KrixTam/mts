@@ -1,7 +1,7 @@
-import unittest
 import os
-from mts.core import DataUnitService, DBConnector
+import unittest
 from mts.const import *
+from mts.core import DataUnitService, DBConnector
 
 
 class TestDataUnitService(unittest.TestCase):

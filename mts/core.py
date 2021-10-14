@@ -1,17 +1,17 @@
 import csv
 import sqlite3
-from abc import abstractmethod
-from os import path, getpid
-from ni.config import Config
-import connectorx as cx
 import threading
-import logging
-from moment import moment
-from random import getrandbits
+import connectorx as cx
 import pandas as pd
+from os import path, getpid
+from abc import abstractmethod
+from random import getrandbits
 from cachetools import TTLCache
 from datetime import datetime
+from moment import moment
+from ni.config import Config
 from mts.const import *
+from mts.utils import logger
 
 
 class ObjectId(object):
@@ -112,10 +112,10 @@ class ObjectId(object):
                 self._id = oid_value
                 self._sc = ObjectId._service_code
             except ValueError:
-                print('非法 id；将自动生成一个新的 Object ID。')
+                logger.info([5000])
                 self._generate()
         else:
-            print('非法 id；将自动生成一个新的 Object ID。')
+            logger.info([5000])
             self._generate()
 
     @staticmethod
@@ -426,7 +426,7 @@ class DataUnitProcessor(object):
             ds = self._ds[service_id]
             ds.init_tables()
         else:
-            logging.warning('不存在数据单元服务：[' + service_id + ']，未能进行初始化处理')
+            logger.warning([1000, service_id])
 
 
 class DataUnitService(object):
@@ -775,7 +775,7 @@ class DataUnit(object):
         return self._service_id
 
     @abstractmethod
-    def query(self, include: dict = None, exclude: dict = None, scope: list = None):
+    def query(self, include: dict = None, exclude: dict = None, scope: dict = None):
         pass
 
 
@@ -786,8 +786,12 @@ class TimeDataUnit(DataUnit):
         self._owner_id = owner_id
         self._processor = tdu_processor
 
-    def query(self, include: dict = None, exclude: dict = None, scope: list = None):
-        pass
+    def query(self, include: dict = None, exclude: dict = None, scope: dict = None):
+        # 参数校验
+        if PV_TDU_QUERY_INCLUDE.validate('include', include):
+            pass
+        else:
+            logger.warning([2000])
 
 
 class SpaceDataUnit(DataUnit):
@@ -813,5 +817,5 @@ class SpaceDataUnit(DataUnit):
     def tags(self):
         return self._tags
 
-    def query(self, include: dict = None, exclude: dict = None, scope: list = None):
+    def query(self, include: dict = None, exclude: dict = None, scope: dict = None):
         pass

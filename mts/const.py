@@ -1,4 +1,6 @@
+from pandas import DataFrame
 from datetime import timedelta
+from ni.config import ParameterValidator
 
 
 def hex_str(num, bits):
@@ -66,3 +68,51 @@ FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR
 
 CACHE_TTL_DEFAULT = timedelta(hours=12)
 CACHE_MAX_SIZE_DEFAULT = 30
+
+QUERY_OID = {
+    'type': 'string',
+    'minLength': 16,
+    'maxLength': 16
+}
+
+PV_TDU_QUERY_INCLUDE = ParameterValidator({
+    'include': {
+        'type': 'object',
+        'properties': {
+            'owner': {
+                'type': 'array',
+                'items': QUERY_OID
+            },
+            'metric': {
+                'type': 'array',
+                'items': QUERY_OID
+            }
+        }
+    },
+    'exclude': {
+        'type': 'object',
+        'properties': {
+            'owner': {
+                'type': 'array',
+                'items': QUERY_OID
+            },
+            'metric': {
+                'type': 'array',
+                'items': QUERY_OID
+            }
+        }
+    },
+    'scope': {
+        'type': 'object',
+        'properties': {
+            'from': {'type': 'string'},
+            'to': {'type': 'string'},
+            'in': {
+                'type': 'array',
+                'items': {'type': 'string'}
+            }
+        }
+    }
+})
+
+EMPTY = DataFrame.empty

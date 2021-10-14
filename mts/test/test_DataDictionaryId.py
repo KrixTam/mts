@@ -1,6 +1,6 @@
 import unittest
-from mts.core import DataDictionaryId
 from mts.const import *
+from mts.core import DataDictionaryId
 
 
 class TestDataDictionaryId(unittest.TestCase):
