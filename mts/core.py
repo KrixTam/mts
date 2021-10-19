@@ -323,20 +323,16 @@ class DBConnector(object):
         if DBConnector._connection is None:
             db_path = DBConnector._db_url.split('://')[1]
             DBConnector._connection = sqlite3.connect(db_path)
-
-    @property
-    def connection(self):
-        DBConnector.connect()
         return DBConnector._connection
 
     @staticmethod
     def get_cursor():
-        cursor = DBConnector.connection.cursor()
+        cursor = DBConnector.connect().cursor()
         return cursor
 
     @staticmethod
     def commit():
-        DBConnector.connection.commit()
+        DBConnector.connect().commit()
 
     @staticmethod
     def disconnect():
