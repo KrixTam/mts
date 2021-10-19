@@ -12,6 +12,9 @@ def hex_str(num, bits):
         return res[bits:]
 
 
+OID_LEN = 16
+DDID_LEN = 17
+
 EPOCH_DEFAULT = 1608480000
 SERVICE_CODE_MIN = int('101000', 2)
 SERVICE_CODE_MAX = int('111111', 2)

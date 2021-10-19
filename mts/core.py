@@ -34,9 +34,9 @@ class ObjectId(object):
             else:
                 raise ValueError(logger.error([5500, service_code, SERVICE_CODE_MIN, SERVICE_CODE_MAX]))
         if oid is None:
-            self._generate()
+            self._id = ObjectId.pack(self._sc)
         else:
-            if isinstance(oid, str) and len(oid) == 16:
+            if isinstance(oid, str) and len(oid) == OID_LEN:
                 self._generate(oid)
             else:
                 if isinstance(oid, ObjectId):
@@ -58,6 +58,14 @@ class ObjectId(object):
         content = content + "Sequence No.: %s\n" % (str(sequence))
         return content
 
+    @classmethod
+    def _generate_pid_code(cls):
+        pid = getpid()
+        if pid != cls._pid:
+            cls._pid = pid
+            cls._pid_code = getrandbits(4)
+        return cls._pid_code
+
     @staticmethod
     def register(settings):
         """注册默认配置"""
@@ -68,30 +76,35 @@ class ObjectId(object):
 
     @staticmethod
     def unpack(oid):
-        service_code = oid >> SERVICE_CODE_BITS_SHIFT
-        last_ts = (oid >> TIMESTAMP_BITS_SHIFT) & TIMESTAMP_MASK
-        pid_code = (oid >> TIMESTAMP_BITS_SHIFT) & PID_CODE_MASK
-        sequence = oid & SEQUENCE_MASK
+        oid_value = oid
+        if isinstance(oid, int):
+            pass
+        else:
+            if isinstance(oid_value, str) and len(oid_value) == OID_LEN:
+                oid_value = int(oid, 16)
+            else:
+                raise TypeError(logger.error([5501, type(oid)]))
+        service_code = oid_value >> SERVICE_CODE_BITS_SHIFT
+        last_ts = (oid_value >> TIMESTAMP_BITS_SHIFT) & TIMESTAMP_MASK
+        pid_code = (oid_value >> TIMESTAMP_BITS_SHIFT) & PID_CODE_MASK
+        sequence = oid_value & SEQUENCE_MASK
         if last_ts <= 0:
             raise ValueError(logger.error([5502]))
         if (service_code < SERVICE_CODE_MIN) or (service_code > SERVICE_CODE_MAX):
             raise ValueError(logger.error([5500, service_code, SERVICE_CODE_MIN, SERVICE_CODE_MAX]))
         return service_code, last_ts, pid_code, sequence
 
-    @classmethod
-    def _generate_pid_code(cls):
-        pid = getpid()
-        if pid != cls._pid:
-            cls._pid = pid
-            cls._pid_code = getrandbits(4)
-        return cls._pid_code
-
-    def _generate(self, oid: str = None):
-        if oid is None:
+    @staticmethod
+    def pack(service_code: int, timestamp: moment = None, sn: int = None):
+        ts = timestamp
+        if timestamp is None:
             ts = moment()
-            assert ts.unix() >= ObjectId._epoch, "异常：时间逆流。"
+            if ts.unix() < ObjectId._epoch:
+                raise ValueError(logger.error([5502]))
             ts = (ts.unix() - ObjectId._epoch) * 1000 + ts.milliseconds()
-            pid_code = ObjectId._generate_pid_code()
+        pid_code = ObjectId._generate_pid_code()
+        sequence = sn
+        if sn is None:
             sequence = 0
             with ObjectId._lock:
                 if ts == ObjectId._last_ts:
@@ -102,44 +115,21 @@ class ObjectId(object):
                 else:
                     ObjectId._sequence = 0
                 ObjectId._last_ts = ts
-            new_id = (self._sc << SERVICE_CODE_BITS_SHIFT) | (ts << TIMESTAMP_BITS_SHIFT) | (pid_code << PID_CODE_BITS_SHIFT) | sequence
-            self._id = new_id
-        else:
-            self._validate(oid)
+        new_id = (service_code << SERVICE_CODE_BITS_SHIFT) | (ts << TIMESTAMP_BITS_SHIFT) | (
+                    pid_code << PID_CODE_BITS_SHIFT) | sequence
+        return new_id
 
-    def _validate(self, oid):
-        if len(oid) == 16:
-            try:
-                oid_value = int(oid, 16)
-                ObjectId._pid = getpid()
-                ObjectId._service_code, ObjectId._last_ts, ObjectId._pid_code, ObjectId._sequence = ObjectId.unpack(oid_value)
-                self._id = oid_value
-                self._sc = ObjectId._service_code
-            except ValueError:
-                logger.info([5000])
-                self._generate()
-        else:
-            logger.info([5000])
-            self._generate()
+    def _generate(self, oid):
+        service_code, last_ts, pid_code, sequence = ObjectId.unpack(oid)
+        self._id = ObjectId.pack(service_code, last_ts, sequence)
 
     @staticmethod
     def validate(oid):
-        if isinstance(oid, int):
-            try:
-                ObjectId.unpack(oid)
-                return True
-            except ValueError:
-                return False
-        else:
-            if isinstance(oid, str) and len(oid) == 16:
-                try:
-                    oid_value = int(oid, 16)
-                    ObjectId.unpack(oid_value)
-                    return True
-                except ValueError:
-                    return False
-            else:
-                return False
+        try:
+            ObjectId.unpack(oid)
+            return True
+        except ValueError:
+            return False
 
     @property
     def value(self):
@@ -188,7 +178,7 @@ class DataDictionaryId(object):
                 if isinstance(ddid, str):
                     self._generate(ddid)
                 else:
-                    raise TypeError("ddid 应为 (str, DataDictionaryId)，而非 %s" % (type(ddid),))
+                    raise TypeError(logger.error([5600, type(ddid)]))
         else:
             if 'oid' in kwargs and 'dd_type' in kwargs:
                 dd_type = kwargs['dd_type']
@@ -203,7 +193,7 @@ class DataDictionaryId(object):
                     oid = ObjectId(service_code=kwargs['service_code'])
                     self._id = DataDictionaryId.pack(dd_type, oid.value)
                 else:
-                    raise ValueError('构建 DataDictionaryId 时，遇到异常的参数。')
+                    raise ValueError(logger.error([5601, kwargs]))
 
     def __str__(self):
         return hex_str(self._id, 17)
@@ -226,7 +216,7 @@ class DataDictionaryId(object):
         if isinstance(ddid, int):
             pass
         else:
-            if isinstance(ddid, str) and len(ddid) == 17:
+            if isinstance(ddid, str) and len(ddid) == DDID_LEN:
                 ddid_value = int(ddid, 16)
             else:
                 raise TypeError("ddid 应为17位长度的字符串，或者是 DataDictionaryId 实例。")

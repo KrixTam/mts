@@ -15,13 +15,13 @@ class TestDataDictionaryId(unittest.TestCase):
         logger.log(a.__repr__())
         logger.log(b.__repr__())
 
-    def test_TypeError(self):
+    def test_error_construct_ddid_type(self):
         with self.assertRaises(TypeError):
-            DataDictionaryId(ddid='a00548d4e5abb001')
+            DataDictionaryId(ddid=['a00548d4e5abb001'])
 
-    def test_ValueError(self):
-        with self.assertRaises(TypeError):
-            DataDictionaryId(oid='a00548d4e5abb001', dd_type=0)
+    def test_error_construct_parameter(self):
+        with self.assertRaises(ValueError):
+            DataDictionaryId(id='a00548d4e5abb001', dd_type=0)
 
 
 if __name__ == '__main__':
