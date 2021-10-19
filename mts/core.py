@@ -29,7 +29,10 @@ class ObjectId(object):
         if service_code is None:
             self._sc = ObjectId._service_code
         else:
-            self._sc = service_code
+            if (service_code >= SERVICE_CODE_MIN) and (service_code <= SERVICE_CODE_MAX):
+                self._sc = service_code
+            else:
+                raise ValueError(logger.error([5500, service_code, SERVICE_CODE_MIN, SERVICE_CODE_MAX]))
         if oid is None:
             self._generate()
         else:
@@ -39,7 +42,7 @@ class ObjectId(object):
                 if isinstance(oid, ObjectId):
                     self._generate(str(oid))
                 else:
-                    raise TypeError("id 应为 (str, ObjectId)，而非 %s" % (type(oid),))
+                    raise TypeError(logger.error([5501, type(oid)]))
 
     def __str__(self):
         return hex_str(self._id, 16)
@@ -57,6 +60,7 @@ class ObjectId(object):
 
     @staticmethod
     def register(settings):
+        """注册默认配置"""
         if 'epoch' in settings and isinstance(settings['epoch'], int):
             ObjectId._epoch = settings['epoch'] & TIMESTAMP_MASK
         if 'service_code' in settings and isinstance(settings['service_code'], int):
@@ -69,9 +73,9 @@ class ObjectId(object):
         pid_code = (oid >> TIMESTAMP_BITS_SHIFT) & PID_CODE_MASK
         sequence = oid & SEQUENCE_MASK
         if last_ts <= 0:
-            raise ValueError('非法 id；时间逆流。')
-        if service_code < SERVICE_CODE_MIN:
-            raise ValueError('非法 service code：%s。' % (str(service_code),))
+            raise ValueError(logger.error([5502]))
+        if (service_code < SERVICE_CODE_MIN) or (service_code > SERVICE_CODE_MAX):
+            raise ValueError(logger.error([5500, service_code, SERVICE_CODE_MIN, SERVICE_CODE_MAX]))
         return service_code, last_ts, pid_code, sequence
 
     @classmethod
@@ -143,32 +147,32 @@ class ObjectId(object):
 
     def __eq__(self, other):
         if isinstance(other, ObjectId):
-            return self._id == other.value
+            return self.value == other.value
         return NotImplemented
 
     def __ne__(self, other):
         if isinstance(other, ObjectId):
-            return self._id != other.value
+            return self.value != other.value
         return NotImplemented
 
     def __lt__(self, other):
         if isinstance(other, ObjectId):
-            return self._id < other.value
+            return self.value < other.value
         return NotImplemented
 
     def __le__(self, other):
         if isinstance(other, ObjectId):
-            return self._id <= other.value
+            return self.value <= other.value
         return NotImplemented
 
     def __gt__(self, other):
         if isinstance(other, ObjectId):
-            return self._id > other.value
+            return self.value > other.value
         return NotImplemented
 
     def __ge__(self, other):
         if isinstance(other, ObjectId):
-            return self._id >= other.value
+            return self.value >= other.value
         return NotImplemented
 
 
@@ -284,9 +288,14 @@ class DataDictionaryId(object):
 class DBConnector(object):
     _db_url = None  # sqlite:///path/to/db
     _connection = None
+    _mode = 0  # 0: cx; 1: sqlite
 
-    def __init__(self):
-        pass
+    def __init__(self, mode=0):
+        DBConnector.set_mode(mode)
+
+    @staticmethod
+    def set_mode(mode:int):
+        DBConnector._mode = mode
 
     @staticmethod
     def register(db_url):
@@ -304,7 +313,10 @@ class DBConnector(object):
             sql = sql + 'WHERE ' + condition
         # TODO：待删除的临时打印信息
         logger.log(sql)
-        return cx.read_sql(DBConnector._db_url, sql)
+        if 0 == DBConnector._mode:
+            return cx.read_sql(DBConnector._db_url, sql)
+        else:
+            return pd.read_sql_query(sql, DBConnector.connect())
 
     @staticmethod
     def connect():
@@ -312,16 +324,19 @@ class DBConnector(object):
             db_path = DBConnector._db_url.split('://')[1]
             DBConnector._connection = sqlite3.connect(db_path)
 
+    @property
+    def connection(self):
+        DBConnector.connect()
+        return DBConnector._connection
+
     @staticmethod
     def get_cursor():
-        DBConnector.connect()
-        cursor = DBConnector._connection.cursor()
+        cursor = DBConnector.connection.cursor()
         return cursor
 
     @staticmethod
     def commit():
-        DBConnector.connect()
-        DBConnector._connection.commit()
+        DBConnector.connection.commit()
 
     @staticmethod
     def disconnect():

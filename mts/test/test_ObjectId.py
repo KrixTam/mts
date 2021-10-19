@@ -1,5 +1,6 @@
 import unittest
 from mts.core import ObjectId
+from mts.const import *
 from mts.utils import logger
 
 
@@ -29,6 +30,33 @@ class TestObjectId(unittest.TestCase):
         logger.log(c.__repr__())
         logger.log(d.__repr__())
         self.assertTrue(a == b)
+
+    def test_error_service_code(self):
+        with self.assertRaises(ValueError):
+            ObjectId(service_code=SERVICE_CODE_MIN-1)
+        with self.assertRaises(ValueError):
+            ObjectId(service_code=SERVICE_CODE_MAX+1)
+
+    def test_error_oid(self):
+        with self.assertRaises(TypeError):
+            ObjectId(123)
+
+    def test_error_unpack_time(self):
+        with self.assertRaises(ValueError):
+            sc = 40
+            ts = 0
+            pid_code = ObjectId._generate_pid_code()
+            new_id = (sc << SERVICE_CODE_BITS_SHIFT) | (ts << TIMESTAMP_BITS_SHIFT) | (pid_code << PID_CODE_BITS_SHIFT) | 0
+            logger.log(new_id)
+            ObjectId.unpack(new_id)
+
+    def test_error_unpack_sc(self):
+        with self.assertRaises(ValueError):
+            ObjectId.unpack(int('900616afc99d6000', 16))
+
+    def test_validate(self):
+        self.assertFalse(ObjectId.validate('900616afc99d6000'))
+        self.assertTrue(ObjectId.validate('a00616afc99d6000'))
 
 
 if __name__ == '__main__':

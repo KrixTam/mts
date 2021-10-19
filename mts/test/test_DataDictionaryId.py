@@ -16,24 +16,12 @@ class TestDataDictionaryId(unittest.TestCase):
         logger.log(b.__repr__())
 
     def test_TypeError(self):
-        try:
+        with self.assertRaises(TypeError):
             DataDictionaryId(ddid='a00548d4e5abb001')
-        except TypeError:
-            pass
-        except Exception:
-            self.fail('unexpected exception raised')
-        else:
-            self.fail('ExpectedException not raised')
 
     def test_ValueError(self):
-        try:
+        with self.assertRaises(TypeError):
             DataDictionaryId(oid='a00548d4e5abb001', dd_type=0)
-        except TypeError:
-            pass
-        except Exception:
-            self.fail('unexpected exception raised')
-        else:
-            self.fail('ExpectedException not raised')
 
 
 if __name__ == '__main__':
