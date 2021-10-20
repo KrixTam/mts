@@ -51,12 +51,8 @@ class ObjectId(object):
         service_code, ts, pid_code, sequence = ObjectId.unpack(self._id)
         now = moment()
         gap = (now.unix() - ObjectId._epoch) * 1000 + now.milliseconds() - ts
-        content = "ObjectId('%s')\n" % (str(self),)
-        content = content + "Service Code: %s\n" % (str(service_code))
-        content = content + "Timestamp: %s\n" % (now.subtract(gap, 'ms').format())
-        content = content + "PID Code: %s\n" % (str(pid_code))
-        content = content + "Sequence No.: %s\n" % (str(sequence))
-        return content
+        content = [str(self), service_code, now.subtract(gap, 'ms').format(), pid_code, sequence]
+        return 'ObjectId({0})\nService Code: {1}\nTimestamp: {2}\nPID Code: {3}\nSequence No.: {4}\n'.format(*content)
 
     @classmethod
     def _generate_pid_code(cls):
@@ -172,15 +168,12 @@ class DataDictionaryId(object):
     def __init__(self, **kwargs):
         if 'ddid' in kwargs:
             ddid = kwargs['ddid']
-            if isinstance(ddid, DataDictionaryId):
+            if isinstance(ddid, DataDictionaryId) or isinstance(ddid, str):
                 self._generate(ddid)
             else:
-                if isinstance(ddid, str):
-                    self._generate(ddid)
-                else:
-                    raise TypeError(logger.error([5600, type(ddid)]))
+                raise TypeError(logger.error([5600, type(ddid)]))
         else:
-            if 'oid' in kwargs and 'dd_type' in kwargs:
+            if ('oid' in kwargs) and ('dd_type' in kwargs):
                 dd_type = kwargs['dd_type']
                 if isinstance(dd_type, str):
                     dd_type = int(dd_type, 16)
@@ -200,11 +193,9 @@ class DataDictionaryId(object):
 
     def __repr__(self):
         dd_type, oid = DataDictionaryId.unpack(self._id)
-        content = "DataDictionaryId('%s')\n" % (str(self),)
-        content = content + "Data Dictionary Type: %s\n" % (dd_type,)
         oid_str = hex_str(oid, 16)
-        content = content + "ObjectId: %s\n" % (oid_str,)
-        return content
+        content = [str(self), dd_type, oid_str]
+        return 'DataDictionaryId({0})\nData Dictionary Type: {1}\nObjectId: {2}\n'.format(*content)
 
     def _generate(self, ddid):
         dd_type, oid = DataDictionaryId.unpack(ddid)
@@ -219,13 +210,13 @@ class DataDictionaryId(object):
             if isinstance(ddid, str) and len(ddid) == DDID_LEN:
                 ddid_value = int(ddid, 16)
             else:
-                raise TypeError("ddid 应为17位长度的字符串，或者是 DataDictionaryId 实例。")
+                raise TypeError(logger.error([5602]))
         dd_type = ddid_value >> DD_TYPE_BITS_SHIFT
         oid = ddid_value & OID_MASK
         if ObjectId.validate(oid) and hex_str(dd_type, 1) in DD_TYPE:
             return dd_type, oid
         else:
-            raise ValueError('异常：非法 ddid。')
+            raise ValueError(logger.error([5603]))
 
     @staticmethod
     def pack(dd_type: int, oid: int):
@@ -333,7 +324,7 @@ class DBConnector(object):
     @staticmethod
     def init_table(table_name, fields):
         if DBConnector._db_url is None:
-            raise ValueError('DBConnector 需要对 db_url 进行登记后方能使用。')
+            raise ValueError(logger.error([5700]))
         else:
             cursor = DBConnector.get_cursor()
             # 如果存在table，先drop掉
@@ -380,11 +371,11 @@ class DBConnector(object):
                     return 'sdu_' + service_id
                 else:
                     if owner_id is None:
-                        raise ValueError('owner_id 不能为 None。')
+                        raise ValueError(logger.error([5702]))
                     else:
                         return 'tdu' + service_id + '_' + owner_id
         else:
-            raise ValueError('table_type 应为 (%s)。' % (TABLE_TYPE,))
+            raise ValueError(logger.error([5701, TABLE_TYPE]))
 
     @staticmethod
     def get_dd(service_id: str, dd_type: str):
@@ -392,7 +383,7 @@ class DBConnector(object):
             dd = DBConnector.query(service_id, TABLE_TYPE_DD)
             return dd[dd['ddid'].str[0] == dd_type]
         else:
-            raise ValueError('异常：未能识别的 dd_type "%s".' % (dd_type,))
+            raise ValueError(logger.error([5703, dd_type]))
 
 
 class DataUnitProcessor(object):
@@ -424,7 +415,7 @@ class DataUnitProcessor(object):
                 ds_object = DataUnitService(ds)
                 self._ds[ds_object.service_id] = ds_object
             else:
-                raise TypeError("ds 应为 (DataService, dict)，而非 %s" % (type(ds),))
+                raise TypeError(logger.error([1001, type(ds)]))
 
     def init_service(self, service_id: str):
         if service_id in self._ds:
@@ -519,12 +510,12 @@ class DataUnitService(object):
             self._config['bak_path'] = path.join(self._config['ds_path'], 'bak')
         if init_flag:
             if self._config.is_default() or self._config.is_default('service_id') or self._config.is_default('ds_path'):
-                raise ValueError('DataUnitService 配置参数错误。')
+                raise ValueError(logger.error([5001]))
             else:
                 self.init_tables()
         else:
             if self._config.is_default('service_id') or self._config.is_default('ds_path'):
-                raise ValueError('请检查 DataUnitService 配置参数 service_id 和 ds_path，不能使用默认值进行初始化处理。')
+                raise ValueError(logger.error([5002]))
             else:
                 self._load_dd()
                 self._init_sdu()
@@ -701,11 +692,11 @@ class DataUnitService(object):
                         if isinstance(args[0], str):
                             return path.join(self._config['bak_path'], self.service_id + '_' + args[0] + FILE_EXT[file_type])
                         else:
-                            raise TypeError('文件类型 "%s" 后必须跟有一个值为 owner id 的参数，或者一个存储着一系列 owner id 的 list。' % (file_type,))
+                            raise TypeError(logger.error([5003]))
                 else:
-                    raise ValueError('暂不支持该 file_type，获取文件名失败。')
+                    raise ValueError(logger.error([5004, file_type]))
         else:
-            raise ValueError('并非预先定义的 file_type，获取文件名失败。')
+            raise ValueError(logger.error([5004, file_type]))
 
     def import_data(self, file_type, table_name, *args):
         filename = self._get_filename(file_type, *args)
@@ -728,7 +719,7 @@ class DataUnitService(object):
                         if isinstance(headers, list):
                             file_handler.write(','.join(headers) + '\n')
                         else:
-                            raise TypeError('headers 的类型必须为包含","的字符串或字符串list')
+                            raise TypeError(logger.error([5005]))
                     for line in content:
                         file_handler.write(line + '\n')
                 else:
@@ -745,9 +736,9 @@ class DataUnitService(object):
                                     line[field] = items[field]
                                 writer.writerow(line)
                         else:
-                            raise TypeError('当 content 为 dict 时，headers必须为字符串的 list')
+                            raise TypeError(logger.error([5006]))
                     else:
-                        raise TypeError('content 的类型必须为 list 或 dict')
+                        raise TypeError(logger.error([5007]))
 
 
 class TDUProcessor(object):
