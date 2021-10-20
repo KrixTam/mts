@@ -213,15 +213,25 @@ class DataDictionaryId(object):
                 raise TypeError(logger.error([5602]))
         dd_type = ddid_value >> DD_TYPE_BITS_SHIFT
         oid = ddid_value & OID_MASK
-        if ObjectId.validate(oid) and hex_str(dd_type, 1) in DD_TYPE:
+        if DataDictionaryId._validate(dd_type, oid):
             return dd_type, oid
         else:
             raise ValueError(logger.error([5603]))
 
     @staticmethod
     def pack(dd_type: int, oid: int):
-        ddid = (dd_type << DD_TYPE_BITS_SHIFT) | oid
-        return ddid
+        if DataDictionaryId._validate(dd_type, oid):
+            ddid = (dd_type << DD_TYPE_BITS_SHIFT) | oid
+            return ddid
+        else:
+            raise ValueError(logger.error([5603]))
+
+    @staticmethod
+    def _validate(dd_type: int, oid: int):
+        if ObjectId.validate(oid) and hex_str(dd_type, 1) in DD_TYPE:
+            return True
+        else:
+            return False
 
     @property
     def value(self):
