@@ -1,23 +1,12 @@
 from pandas import DataFrame
 from datetime import timedelta
 from ni.config import ParameterValidator
+from mts.utils import hex_str
 
-
-def hex_str(num, bits):
-    length = abs(bits)
-    res = "{0:0{1}x}".format(num, length)
-    if bits > 0:
-        return res[:bits]
-    else:
-        return res[bits:]
-
-
-OID_LEN = 16
-DDID_LEN = 17
 
 EPOCH_DEFAULT = 1608480000
-SERVICE_CODE_MIN = int('101000', 2)
-SERVICE_CODE_MAX = int('111111', 2)
+DB_MODE_CX = 0  # connectX
+DB_MODE_SD = 1  # sqlite
 
 SERVICE_CODE_BITS = 6
 TIMESTAMP_BITS = 42
@@ -73,23 +62,70 @@ FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR
 CACHE_TTL_DEFAULT = timedelta(hours=12)
 CACHE_MAX_SIZE_DEFAULT = 30
 
-QUERY_OID = {
+TIMESTAMP_FORMAT = 'YYYYMMDD HHmmss.SSS ZZ'
+
+
+OID_LEN = 16
+DDID_LEN = 17
+
+OID = {
     'type': 'string',
-    'minLength': 16,
-    'maxLength': 16
+    'pattern': '[a-f0-9]{16}'
 }
 
-PV_TDU_QUERY_INCLUDE = ParameterValidator({
+PV_ID = ParameterValidator({
+    'oid': OID,
+    'ddid': {
+        'type': 'string',
+        'pattern': '[a-f0-9]{17}'
+    }
+})
+
+SERVICE_CODE_MIN = int('101000', 2)
+SERVICE_CODE_MAX = int('111111', 2)
+
+PV_SERVICE = ParameterValidator({
+    'service_code': {
+        'type': 'integer',
+        'minimum': SERVICE_CODE_MIN,
+        'maximum': SERVICE_CODE_MAX
+    },
+    'service_id': {
+        'type': 'string',
+        'pattern': '[0-7]{2}',
+    }
+})
+
+PV_TDU_QUERY = ParameterValidator({
+    'metric': {
+        'type': 'array',
+        'items': OID
+    },
+    'interval': {
+        'type': 'object',
+        'properties': {
+            'from': {'type': 'string'},
+            'to': {'type': 'string'}
+            }
+    },
+    'in': {
+        'type': 'array',
+        'items': {'type': 'string'},
+        'minItems': 1
+    }
+})
+
+PV_SDU_QUERY = ParameterValidator({
     'include': {
         'type': 'object',
         'properties': {
             'owner': {
                 'type': 'array',
-                'items': QUERY_OID
+                'items': OID
             },
             'metric': {
                 'type': 'array',
-                'items': QUERY_OID
+                'items': OID
             }
         }
     },
@@ -98,22 +134,24 @@ PV_TDU_QUERY_INCLUDE = ParameterValidator({
         'properties': {
             'owner': {
                 'type': 'array',
-                'items': QUERY_OID
+                'items': OID
             },
             'metric': {
                 'type': 'array',
-                'items': QUERY_OID
+                'items': OID
             }
         }
-    },
-    'scope': {
-        'type': 'object',
-        'properties': {
-            'from': {'type': 'string'},
-            'to': {'type': 'string'},
-            'in': {
-                'type': 'array',
-                'items': {'type': 'string'}
+    }
+})
+
+PV_TDU_ADD = ParameterValidator({
+    'records': {
+        'type': 'array',
+        'items': {
+            'type': 'object',
+            'properties': {
+                'ts': {'type': 'string'},
+                'data': {'type': 'object'}
             }
         }
     }

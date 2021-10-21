@@ -1,4 +1,18 @@
 from ni.config.tools import Logger
+from moment import moment
+
+
+def hex_str(num, bits):
+    length = abs(bits)
+    res = "{0:0{1}x}".format(num, length)
+    if bits > 0:
+        return res[:bits]
+    else:
+        return res[bits:]
+
+
+def get_timestamp(ori_data: str):
+    m = moment(ori_data).format('x')
 
 # 1000-1999：DataUnitProcessor
 # 2000-2499：TimeDataUnit
@@ -8,12 +22,16 @@ from ni.config.tools import Logger
 # 5000-5499：DataUnitService
 # 5500-5599：ObjectId
 # 5600-5699：DataDictionaryId
-# 5700-5999：DBConnector
+# 5700-5999：DBHandler
+
 
 ERROR_DEF = {
     '1000': '[{0}] 不存在数据单元服务：[{1}]，未能进行初始化处理。',
     '1001': '[{0}] 参数ds的类型应为DataService或dict，而非{1}。',
-    '2000': '[{0}] 调用TimeDataUnit的query时，include参数不符合规范。',
+    '2000': '[{0}] 调用TimeDataUnit的query方法，其参数不符合规范。',
+    '2001': '[{0}] 调用TimeDataUnit的add方法，其参数不符合规范。',
+    '2002': '[{0}] 构建TimeDataUnit失败，owner_id值异常。',
+    '4500': '[{0}] 构建DataUnit失败，service_id值异常。',
     '5000': '[{0}] 非法id；将自动生成一个新的 Object ID。',
     '5001': '[{0}] DataUnitService配置参数错误。',
     '5002': '[{0}] 请检查DataUnitService配置参数service_id和ds_path，不能使用默认值进行初始化处理。',
@@ -33,6 +51,7 @@ ERROR_DEF = {
     '5701': '[{0}] 参数table_type应为({1})。',
     '5702': '[{0}] 参数owner_id不能为None。',
     '5703': '[{0}] 异常：未能识别的dd_type({1})。',
+    '5704': '[{0}] get_table_name的参数service_id值异常。',
 }
 
 logger = Logger(ERROR_DEF, 'mts')
