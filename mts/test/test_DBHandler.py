@@ -1,8 +1,7 @@
-import unittest
 import os
+import unittest
 from mts.core import DBHandler
 from mts.const import *
-from mts.utils import logger
 
 output_dir = os.path.join(os.getcwd(), 'output')
 if not os.path.exists(output_dir):
@@ -52,6 +51,8 @@ class TestDBHandler(unittest.TestCase):
         fields_dd = list(FIELDS_DD.keys())
         fields_dd.sort()
         self.assertEqual(fields, fields_dd)
+        self.assertTrue(DBHandler.exist_table(dd_table_name))
+        self.assertFalse(DBHandler.exist_table('abc'))
 
     def test_error(self):
         with self.assertRaises(ValueError):

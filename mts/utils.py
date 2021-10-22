@@ -22,7 +22,8 @@ def get_timestamp(ori_data: str):
 # 5000-5499：DataUnitService
 # 5500-5599：ObjectId
 # 5600-5699：DataDictionaryId
-# 5700-5999：DBHandler
+# 5700-5799：DBHandler
+# 5800-5899：DataDictionary
 
 
 ERROR_DEF = {
@@ -31,6 +32,7 @@ ERROR_DEF = {
     '2000': '[{0}] 调用TimeDataUnit的query方法，其参数不符合规范。',
     '2001': '[{0}] 调用TimeDataUnit的add方法，其参数不符合规范。',
     '2002': '[{0}] 构建TimeDataUnit失败，owner_id值异常。',
+    '2003': '[{0}] TimeDataUnit对应的数据库表不存在，或者DB异常，导致query失败。',
     '4500': '[{0}] 构建DataUnit失败，service_id值异常。',
     '5000': '[{0}] 非法id；将自动生成一个新的 Object ID。',
     '5001': '[{0}] DataUnitService配置参数错误。',
@@ -50,8 +52,13 @@ ERROR_DEF = {
     '5700': '[{0}] DBConnector需要对db_url进行登记(register)后方能使用。',
     '5701': '[{0}] 参数table_type应为({1})。',
     '5702': '[{0}] 参数owner_id不能为None。',
-    '5703': '[{0}] 异常：未能识别的dd_type({1})。',
+    # '5703': '[{0}] 异常：未能识别的dd_type({1})。',
     '5704': '[{0}] get_table_name的参数service_id值异常。',
+    # '5705': '[{0}] get_dd的参数service_id值异常。',
+    '5706': '[{0}] get_table_name的参数owner_id值异常。',
+    '5800': '[{0}] 构建DataDictionary失败，service_id值异常。',
+    '5801': '[{0}] 异常：未能识别的dd_type({1})。',
+    '5802': '[{0}] query_dd的参数service_id值异常。',
 }
 
 logger = Logger(ERROR_DEF, 'mts')

@@ -12,6 +12,7 @@ from moment import moment
 from ni.config import Config
 from mts.const import *
 from mts.utils import logger
+from pandas.io.sql import DatabaseError
 
 
 class ObjectId(object):
@@ -352,6 +353,10 @@ class DBHandler(object):
         return tables
 
     @staticmethod
+    def exist_table(table_name):
+        return table_name in DBHandler.get_tables()
+
+    @staticmethod
     def init_table(table_name: str, fields: dict):
         if DBHandler._db_url is None:
             raise ValueError(logger.error([5700]))
@@ -392,7 +397,7 @@ class DBHandler(object):
 
     @staticmethod
     def get_table_name(service_id: str, table_type: str, owner_id: str = None):
-        if PV_SERVICE.validate('service_id', service_id):
+        if PV_SERVICE.validate(KEY_SERVICE_ID, service_id):
             if table_type in TABLE_TYPE:
                 if table_type == TABLE_TYPE_DD:
                     return 'dd_' + service_id
@@ -403,19 +408,14 @@ class DBHandler(object):
                         if owner_id is None:
                             raise ValueError(logger.error([5702]))
                         else:
-                            return 'tdu_' + service_id + '_' + owner_id
+                            if PV_ID.validate('oid', owner_id):
+                                return 'tdu_' + service_id + '_' + owner_id
+                            else:
+                                raise ValueError(logger.error([5706]))
             else:
                 raise ValueError(logger.error([5701, TABLE_TYPE]))
         else:
             raise ValueError(logger.error([5704]))
-
-    @staticmethod
-    def get_dd(service_id: str, dd_type: str):
-        if dd_type in DD_TYPE:
-            dd = DBHandler.query(service_id, TABLE_TYPE_DD)
-            return dd[dd['ddid'].str[0] == dd_type]
-        else:
-            raise ValueError(logger.error([5703, dd_type]))
 
 
 class DataUnitProcessor(object):
@@ -542,12 +542,12 @@ class DataUnitService(object):
         if self._config.is_default('bak_path'):
             self._config['bak_path'] = path.join(self._config['ds_path'], 'bak')
         if init_flag:
-            if self._config.is_default() or self._config.is_default('service_id') or self._config.is_default('ds_path'):
+            if self._config.is_default() or self._config.is_default(KEY_SERVICE_ID) or self._config.is_default('ds_path'):
                 raise ValueError(logger.error([5001]))
             else:
                 self.init_tables()
         else:
-            if self._config.is_default('service_id') or self._config.is_default('ds_path'):
+            if self._config.is_default(KEY_SERVICE_ID) or self._config.is_default('ds_path'):
                 raise ValueError(logger.error([5002]))
             else:
                 self._load_dd()
@@ -557,7 +557,7 @@ class DataUnitService(object):
 
     @property
     def service_id(self):
-        return self._config['service_id']
+        return self._config[KEY_SERVICE_ID]
 
     @property
     def service_code(self):
@@ -605,7 +605,11 @@ class DataUnitService(object):
         self._dd = DBHandler.query(self.service_id, TABLE_TYPE_DD)
 
     def _init_sdu(self):
-        self._sdu = SpaceDataUnit(self.service_id)
+        dd_tag = DataDictionary.query_dd(self.service_id, DD_TYPE_TAG)
+        logger.log(dd_tag)
+        dd_tag_value = DataDictionary.query_dd(self.service_id, DD_TYPE_TAG_VALUE)
+        logger.log(dd_tag_value)
+        self._sdu = SpaceDataUnit(self.service_id, dd_tag, dd_tag_value)
 
     def _init_tdu(self):
         # TODO：初始化TDU
@@ -776,16 +780,12 @@ class DataUnitService(object):
 
 
 class TDUProcessor(object):
-    __slots__ = ('_tdus', '_owners', '_metrics')
+    __slots__ = ('_cache', '_owners', '_metrics')
 
     def __init__(self, service_id, cache_size=CACHE_MAX_SIZE_DEFAULT, time_to_live=CACHE_TTL_DEFAULT):
-        dd_owners = DBHandler.get_dd(service_id, DD_TYPE_OWNER)
-        dd_metrics = DBHandler.get_dd(service_id, DD_TYPE_METRIC)
-        self._tdus = TTLCache(maxsize=cache_size, ttl=time_to_live, timer=datetime.now)
-        self._owners = dd_owners['ddid'].str[1:].tolist()
-        self._owners.sort()
-        self._metrics = dd_metrics['ddid'].str[1:].tolist()
-        self._metrics.sort()
+        self._cache = TTLCache(maxsize=cache_size, ttl=time_to_live, timer=datetime.now)
+        self._owners = DataDictionary.query_oid(service_id, DD_TYPE_OWNER)
+        self._metrics = DataDictionary.query_oid(service_id, DD_TYPE_METRIC)
 
     @property
     def owners(self):
@@ -796,10 +796,58 @@ class TDUProcessor(object):
         return self._metrics
 
 
+class DataDictionary(object):
+
+    def __init__(self, service_id: str):
+        if PV_SERVICE.validate(KEY_SERVICE_ID, service_id):
+            self._service_id = service_id
+            if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD)):
+                self._data = DBHandler.query(service_id, TABLE_TYPE_DD)
+            else:
+                DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD), FIELDS_DD)
+                self._data = DBHandler.query(service_id, TABLE_TYPE_DD)
+        else:
+            raise ValueError(logger.error([5800]))
+
+    def sync_db(self, filename, init_flag=False):
+        table_name = DBHandler.get_table_name(self._service_id, TABLE_TYPE_DD)
+        if init_flag:
+            DBHandler.init_table(table_name, FIELDS_DD)
+        DBHandler.import_data(filename, table_name)
+        self._data = DBHandler.query(self._service_id, TABLE_TYPE_DD)
+
+    def get_oid(self, dd_type: str):
+        if dd_type in DD_TYPE:
+            res = self._data[self._data[FIELD_DDID].str[0] == dd_type][FIELD_DDID].apply(lambda x: x[1:]).tolist()
+            res.sort()
+            return res
+        else:
+            raise ValueError(logger.error([5801, dd_type]))
+
+    @staticmethod
+    def query_oid(service_id: str, dd_type: str):
+        data = DataDictionary.query_dd(service_id, dd_type)
+        res = data[FIELD_DDID].apply(lambda x: x[1:]).tolist()
+        res.sort()
+        return res
+
+    @staticmethod
+    def query_dd(service_id: str, dd_type: str):
+        if PV_SERVICE.validate(KEY_SERVICE_ID, service_id):
+            if dd_type in DD_TYPE:
+                data = DBHandler.query(service_id, TABLE_TYPE_DD)
+                res = data[data[FIELD_DDID].str[0] == dd_type]
+                return res
+            else:
+                raise ValueError(logger.error([5801, dd_type]))
+        else:
+            raise ValueError(logger.error([5802]))
+
+
 class DataUnit(object):
 
     def __init__(self, service_id: str):
-        if PV_SERVICE.validate('service_id', service_id):
+        if PV_SERVICE.validate(KEY_SERVICE_ID, service_id):
             self._service_id = service_id
         else:
             raise ValueError(logger.error([4500]))
@@ -829,9 +877,17 @@ class TimeDataUnit(DataUnit):
 
     def __init__(self, service_id, owner_id):
         super().__init__(service_id)
-        if PV_ID.validate('oid', owner_id):
+        if PV_ID.validate(KEY_OID, owner_id):
             self._owner_id = owner_id
-            self._metric = DBHandler.get_fields(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id))
+            if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id)):
+                self._metric = DBHandler.get_fields(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id))
+                self._metric.remove(FIELD_TIMESTAMP)
+            else:
+                self._metric = DataDictionary.query_oid(service_id, DD_TYPE_METRIC)
+                tdu_fields = {'timestamp': 'VARCHAR(16)'}  # String of Unix Millisecond Timestamp
+                for metric in self._metric:
+                    tdu_fields[metric] = 'VARCHAR(16)'
+                DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id), tdu_fields)
         else:
             raise ValueError(logger.error([4500]))
 
@@ -839,6 +895,7 @@ class TimeDataUnit(DataUnit):
         # 参数校验
         if PV_TDU_QUERY.validates(kwargs):
             fields = None
+            res = None
             if ('metric' in kwargs) and (len(kwargs['metric']) > 0):
                 fields = kwargs['metric']
             condition = None
@@ -846,9 +903,17 @@ class TimeDataUnit(DataUnit):
                 condition = 'timestamp >= {0} AND timestamp <= {1}'.format(*[kwargs['interval']['from'], kwargs['interval']['to']])
             else:
                 if 'in' in kwargs:
-                    condition = 'timestamp in ({0})'.format(','.join(['?']*len(kwargs['in'])))
-            res = DBHandler.query(self._service_id, TABLE_TYPE_TDU, fields, condition, self._owner_id)
-            return res
+                    claus = []
+                    for item in kwargs['in']:
+                        claus.append('timestamp = {0}'.format(*[item]))
+                    condition = ' OR '.join(claus)
+            try:
+                res = DBHandler.query(self._service_id, TABLE_TYPE_TDU, fields, condition, self._owner_id)
+            except (DatabaseError, RuntimeError):
+                logger.error([2003])
+                res = pd.DataFrame(columns=self._metric)
+            finally:
+                return res
         else:
             raise ValueError(logger.error([2000]))
 
@@ -862,15 +927,16 @@ class TimeDataUnit(DataUnit):
         pass
 
     def sync_db(self, filename, init_flag=False):
+        # DBHandler.import_data(filename, DBHandler.get_table_name(self._service_id, TABLE_TYPE_TDU, self._owner_id))
         pass
 
 
 class SpaceDataUnit(DataUnit):
 
-    def __init__(self, service_id):
+    def __init__(self, service_id, dd_tag, dd_tag_value):
         super().__init__(service_id)
-        dd_tag = DBHandler.get_dd(service_id, DD_TYPE_TAG)
-        dd_tag_value = DBHandler.get_dd(service_id, DD_TYPE_TAG_VALUE)
+        # dd_tag = DBHandler.get_dd(service_id, DD_TYPE_TAG)
+        # dd_tag_value = DBHandler.get_dd(service_id, DD_TYPE_TAG_VALUE)
         self._tags = []
         self._tag_definition = {}
         for index, row in dd_tag.iterrows():
