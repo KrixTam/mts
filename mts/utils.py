@@ -52,7 +52,7 @@ ERROR_DEF = {
     '5700': '[{0}] DBConnector需要对db_url进行登记(register)后方能使用。',
     '5701': '[{0}] 参数table_type应为({1})。',
     '5702': '[{0}] 参数owner_id不能为None。',
-    # '5703': '[{0}] 异常：未能识别的dd_type({1})。',
+    '5703': '[{0}] init_table参数fields值异常',
     '5704': '[{0}] get_table_name的参数service_id值异常。',
     # '5705': '[{0}] get_dd的参数service_id值异常。',
     '5706': '[{0}] get_table_name的参数owner_id值异常。',

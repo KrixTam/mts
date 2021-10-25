@@ -62,7 +62,7 @@ FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR
 CACHE_TTL_DEFAULT = timedelta(hours=12)
 CACHE_MAX_SIZE_DEFAULT = 30
 
-TIMESTAMP_FORMAT = 'YYYYMMDD HHmmss.SSS ZZ'
+MOMENT_FORMAT = 'X.SSS'
 
 KEY_OID = 'oid'
 KEY_SERVICE_ID = 'service_id'
@@ -98,6 +98,13 @@ PV_SERVICE = ParameterValidator({
     'service_id': {
         'type': 'string',
         'pattern': '[0-7]{2}',
+    }
+})
+
+PV_DB_DEFINITION = ParameterValidator({
+    'field': {
+        'type': 'object',
+        'minProperties': 1
     }
 })
 

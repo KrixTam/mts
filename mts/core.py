@@ -361,23 +361,26 @@ class DBHandler(object):
         if DBHandler._db_url is None:
             raise ValueError(logger.error([5700]))
         else:
-            cursor = DBHandler.get_cursor()
-            # 如果存在table，先drop掉
-            sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + table_name + "'"
-            cursor.execute(sql)
-            if cursor.fetchone()[0] == 1:
-                sql = "DROP TABLE " + table_name
+            if PV_DB_DEFINITION.validate('field', fields):
+                cursor = DBHandler.get_cursor()
+                # 如果存在table，先drop掉
+                sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + table_name + "'"
                 cursor.execute(sql)
-            # 创建table
-            fields_def = []
-            for key, value in fields.items():
-                fields_def.append('[' + key + '] ' + value)
-            sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields_def) + ")"
-            # TODO：待删除的临时打印信息
-            logger.log(sql)
-            cursor.execute(sql)
-            DBHandler.commit()
-            cursor.close()
+                if cursor.fetchone()[0] == 1:
+                    sql = "DROP TABLE " + table_name
+                    cursor.execute(sql)
+                # 创建table
+                fields_def = []
+                for key, value in fields.items():
+                    fields_def.append('[' + key + '] ' + value)
+                sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields_def) + ")"
+                # TODO：待删除的临时打印信息
+                logger.log(sql)
+                cursor.execute(sql)
+                DBHandler.commit()
+                cursor.close()
+            else:
+                raise ValueError(logger.error([5703]))
 
     @staticmethod
     def import_data(filename, table_name):
@@ -609,7 +612,7 @@ class DataUnitService(object):
         logger.log(dd_tag)
         dd_tag_value = DataDictionary.query_dd(self.service_id, DD_TYPE_TAG_VALUE)
         logger.log(dd_tag_value)
-        self._sdu = SpaceDataUnit(self.service_id, dd_tag, dd_tag_value)
+        self._sdu = SpaceDataUnit(self.service_id)
 
     def _init_tdu(self):
         # TODO：初始化TDU
@@ -857,6 +860,10 @@ class DataUnit(object):
         return self._service_id
 
     @abstractmethod
+    def fields(self):
+        pass
+
+    @abstractmethod
     def query(self, **kwargs):
         pass
 
@@ -872,6 +879,10 @@ class DataUnit(object):
     def sync_db(self, filename, init_flag=False):
         pass
 
+    @abstractmethod
+    def import_data(self, filename):
+        pass
+
 
 class TimeDataUnit(DataUnit):
 
@@ -884,12 +895,16 @@ class TimeDataUnit(DataUnit):
                 self._metric.remove(FIELD_TIMESTAMP)
             else:
                 self._metric = DataDictionary.query_oid(service_id, DD_TYPE_METRIC)
-                tdu_fields = {'timestamp': 'VARCHAR(16)'}  # String of Unix Millisecond Timestamp
-                for metric in self._metric:
-                    tdu_fields[metric] = 'VARCHAR(16)'
+                tdu_fields = self.fields()
                 DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id), tdu_fields)
         else:
             raise ValueError(logger.error([4500]))
+
+    def fields(self):
+        fields = {FIELD_TIMESTAMP: 'VARCHAR(16)'}  # String of Unix Millisecond Timestamp
+        for metric in self._metric:
+            fields[metric] = 'VARCHAR(16)'
+        return fields
 
     def query(self, **kwargs):
         # 参数校验
@@ -911,11 +926,20 @@ class TimeDataUnit(DataUnit):
                 res = DBHandler.query(self._service_id, TABLE_TYPE_TDU, fields, condition, self._owner_id)
             except (DatabaseError, RuntimeError):
                 logger.error([2003])
-                res = pd.DataFrame(columns=self._metric)
+                res = pd.DataFrame(columns=self.fields().keys())
             finally:
+                res[FIELD_TIMESTAMP] = TimeDataUnit.to_date(res[FIELD_TIMESTAMP])
+                res.index = res[FIELD_TIMESTAMP]
+                del res[FIELD_TIMESTAMP]
+                res[self._metric] = res[self._metric].apply(pd.to_numeric)
                 return res
         else:
             raise ValueError(logger.error([2000]))
+
+    @staticmethod
+    def to_date(data):
+        # moment(date_str).format(MOMENT_FORMAT)
+        return pd.to_datetime(data, unit='s') + pd.Timedelta('08:00:00')
 
     def add(self, **kwargs):
         if PV_TDU_ADD.validates(kwargs):
@@ -927,16 +951,22 @@ class TimeDataUnit(DataUnit):
         pass
 
     def sync_db(self, filename, init_flag=False):
-        # DBHandler.import_data(filename, DBHandler.get_table_name(self._service_id, TABLE_TYPE_TDU, self._owner_id))
+        table_name = DBHandler.get_table_name(self._service_id, TABLE_TYPE_TDU, self._owner_id)
+        if init_flag:
+            tdu_fields = self.fields()
+            DBHandler.init_table(table_name, tdu_fields)
+        DBHandler.import_data(filename, table_name)
+
+    def import_data(self, filename):
         pass
 
 
 class SpaceDataUnit(DataUnit):
 
-    def __init__(self, service_id, dd_tag, dd_tag_value):
+    def __init__(self, service_id):
         super().__init__(service_id)
-        # dd_tag = DBHandler.get_dd(service_id, DD_TYPE_TAG)
-        # dd_tag_value = DBHandler.get_dd(service_id, DD_TYPE_TAG_VALUE)
+        dd_tag = DataDictionary.query_dd(service_id, DD_TYPE_TAG)
+        dd_tag_value = DataDictionary.query_dd(service_id, DD_TYPE_TAG_VALUE)
         self._tags = []
         self._tag_definition = {}
         for index, row in dd_tag.iterrows():
@@ -954,6 +984,9 @@ class SpaceDataUnit(DataUnit):
     def tags(self):
         return self._tags
 
+    def fields(self):
+        pass
+
     def query(self, **kwargs):
         pass
 
@@ -964,4 +997,7 @@ class SpaceDataUnit(DataUnit):
         pass
 
     def sync_db(self, filename, init_flag=False):
+        pass
+
+    def import_data(self, filename):
         pass
