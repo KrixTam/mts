@@ -912,15 +912,20 @@ class TimeDataUnit(DataUnit):
             fields = None
             res = None
             if ('metric' in kwargs) and (len(kwargs['metric']) > 0):
-                fields = kwargs['metric']
+                fields = kwargs['metric'].copy()
+                fields.append(FIELD_TIMESTAMP)
             condition = None
             if 'interval' in kwargs:
-                condition = 'timestamp >= {0} AND timestamp <= {1}'.format(*[kwargs['interval']['from'], kwargs['interval']['to']])
+                c = FIELD_TIMESTAMP + " >= '{0}' AND " + FIELD_TIMESTAMP + " <= '{1}'"
+                date_from = moment(kwargs['interval']['from']).format(MOMENT_FORMAT)
+                date_to = moment(kwargs['interval']['to']).format(MOMENT_FORMAT)
+                condition = c.format(*[date_from, date_to])
             else:
-                if 'in' in kwargs:
+                if 'any' in kwargs:
                     claus = []
-                    for item in kwargs['in']:
-                        claus.append('timestamp = {0}'.format(*[item]))
+                    c = FIELD_TIMESTAMP + " = '{0}'"
+                    for item in kwargs['any']:
+                        claus.append(c.format(*[moment(item).format(MOMENT_FORMAT)]))
                     condition = ' OR '.join(claus)
             try:
                 res = DBHandler.query(self._service_id, TABLE_TYPE_TDU, fields, condition, self._owner_id)
@@ -931,7 +936,10 @@ class TimeDataUnit(DataUnit):
                 res[FIELD_TIMESTAMP] = TimeDataUnit.to_date(res[FIELD_TIMESTAMP])
                 res.index = res[FIELD_TIMESTAMP]
                 del res[FIELD_TIMESTAMP]
-                res[self._metric] = res[self._metric].apply(pd.to_numeric)
+                if fields is None:
+                    res[self._metric] = res[self._metric].apply(pd.to_numeric)
+                else:
+                    res[kwargs['metric']] = res[kwargs['metric']].apply(pd.to_numeric)
                 return res
         else:
             raise ValueError(logger.error([2000]))

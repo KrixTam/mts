@@ -120,7 +120,7 @@ PV_TDU_QUERY = ParameterValidator({
             'to': {'type': 'string'}
             }
     },
-    'in': {
+    'any': {
         'type': 'array',
         'items': {'type': 'string'},
         'minItems': 1
