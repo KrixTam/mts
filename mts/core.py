@@ -281,9 +281,23 @@ class DBHandler(object):
     _db_url = None  # sqlite:///path/to/db
     _connection = None
     _mode = DB_MODE_CX
+    _tz = pd.Timedelta(DEFAULT_TZ)
 
-    def __init__(self, mode=0):
+    def __init__(self, mode=0, tz=DEFAULT_TZ):
         DBHandler.set_mode(mode)
+        DBHandler.set_tz(tz)
+
+    @staticmethod
+    def set_tz(tz=DEFAULT_TZ):
+        if PV_TZ.validate('tz', tz):
+            DBHandler._tz = pd.Timedelta(tz)
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def tz():
+        return DBHandler._tz
 
     @staticmethod
     def set_mode(mode: int):
@@ -303,8 +317,6 @@ class DBHandler(object):
             sql = sql + ', '.join(fields) + ' from ' + table_name
         if condition is not None:
             sql = sql + ' WHERE ' + condition
-        # TODO：待删除的临时打印信息
-        logger.log(sql)
         if 0 == DBHandler._mode:
             return cx.read_sql(DBHandler._db_url, sql)
         else:
@@ -374,8 +386,6 @@ class DBHandler(object):
                 for key, value in fields.items():
                     fields_def.append('[' + key + '] ' + value)
                 sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields_def) + ")"
-                # TODO：待删除的临时打印信息
-                logger.log(sql)
                 cursor.execute(sql)
                 DBHandler.commit()
                 cursor.close()
@@ -388,12 +398,8 @@ class DBHandler(object):
         with open(filename, 'r') as fin:
             dr = csv.DictReader(fin)
             to_db = [tuple([row[field] for field in dr.fieldnames]) for row in dr]
-            # TODO：待删除的临时打印信息
-            logger.log(to_db)
-            sql = 'INSERT INTO ' + table_name + ' ' + str(tuple(dr.fieldnames)).replace("'", '')
+            sql = 'INSERT OR IGNORE INTO ' + table_name + ' ' + str(tuple(dr.fieldnames)).replace("'", '')
             sql = sql + ' VALUES (' + ', '.join(list('?' * len(dr.fieldnames))) + ');'
-            # TODO：待删除的临时打印信息
-            logger.log(sql)
             cursor.executemany(sql, to_db)
             DBHandler.commit()
         cursor.close()
@@ -946,8 +952,7 @@ class TimeDataUnit(DataUnit):
 
     @staticmethod
     def to_date(data):
-        # TODO 时区可配置
-        return pd.to_datetime(data, unit='s') + pd.Timedelta('08:00:00')
+        return pd.to_datetime(data, unit='s') + DBHandler.tz()
 
     def add(self, **kwargs):
         if PV_TDU_ADD.validates(kwargs):

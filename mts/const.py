@@ -169,4 +169,13 @@ PV_TDU_ADD = ParameterValidator({
     }
 })
 
+DEFAULT_TZ = '08:00:00'
+
+PV_TZ = ParameterValidator({
+    'tz': {
+        'type': 'string',
+        'pattern': '^(?:(?:([01]?\d|2[0-3]):)?([0-5]?\d):)?([0-5]?\d)$'
+    }
+})
+
 EMPTY = DataFrame.empty
