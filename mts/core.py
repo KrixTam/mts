@@ -901,7 +901,7 @@ class TimeDataUnit(DataUnit):
             raise ValueError(logger.error([4500]))
 
     def fields(self):
-        fields = {FIELD_TIMESTAMP: 'VARCHAR(16)'}  # String of Unix Millisecond Timestamp
+        fields = {FIELD_TIMESTAMP: 'VARCHAR(16) PRIMARY KEY'}  # String of Unix Millisecond Timestamp
         for metric in self._metric:
             fields[metric] = 'VARCHAR(16)'
         return fields
@@ -946,7 +946,7 @@ class TimeDataUnit(DataUnit):
 
     @staticmethod
     def to_date(data):
-        # moment(date_str).format(MOMENT_FORMAT)
+        # TODO 时区可配置
         return pd.to_datetime(data, unit='s') + pd.Timedelta('08:00:00')
 
     def add(self, **kwargs):

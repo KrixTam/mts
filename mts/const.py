@@ -57,7 +57,7 @@ FILE_EXT = {
     FILE_TYPE_TDU_RAW: '.rtdu'
 }
 
-FIELDS_DD = {'ddid': 'VARCHAR(17)', 'disc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR(32)'}
+FIELDS_DD = {'ddid': 'VARCHAR(17) PRIMARY KEY', 'disc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR(32)'}
 
 CACHE_TTL_DEFAULT = timedelta(hours=12)
 CACHE_MAX_SIZE_DEFAULT = 30
