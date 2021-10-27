@@ -485,7 +485,7 @@ class DataUnitService(object):
                         'name': 'xxx',
                         'values': [
                             {
-                                'disc': 'xxx',
+                                'desc': 'xxx',
                                 'owners': []
                             }
                         ]
@@ -526,7 +526,7 @@ class DataUnitService(object):
                                     'items': {
                                         'type': 'object',
                                         'properties': {
-                                            'disc': {'type': 'string'},
+                                            'desc': {'type': 'string'},
                                             'owners': {
                                                 'type': 'array',
                                                 'items': {'type': 'string'}
@@ -590,8 +590,9 @@ class DataUnitService(object):
     def tags(self):
         return self._sdu.tags
 
-    def disc(self, ddid: str = None, dd_type: str = None, oid: str = None):
+    def desc(self, ddid: str = None, dd_type: str = None, oid: str = None):
         data = self._dd
+        logger.log((data))
         if ddid is None:
             if dd_type is None:
                 if oid is None:
@@ -606,7 +607,7 @@ class DataUnitService(object):
                     data = self._dd[self._dd['ddid'] == ddid_val]
         else:
             data = self._dd[self._dd['ddid'] == ddid]
-        res = data['disc'].values.tolist()
+        res = data['desc'].values.tolist()
         res.sort()
         return res
 
@@ -659,7 +660,7 @@ class DataUnitService(object):
                 mask_bit = mask_bit + 1
                 mask = -1 ^ (-1 << mask_bit)
                 mask_str = tag_oid + hex_str(mask_bit, 16)
-                line = str(DataDictionaryId(dd_type=DD_TYPE_TAG_VALUE, service_code=self.service_code)) + ',' + tag_value['disc'] + ',' + mask_str
+                line = str(DataDictionaryId(dd_type=DD_TYPE_TAG_VALUE, service_code=self.service_code)) + ',' + tag_value['desc'] + ',' + mask_str
                 ddid_content.append(line)
                 for owner in tag_value['owners']:
                     if owner in tag_value_mappings[tag_oid]:
@@ -704,10 +705,10 @@ class DataUnitService(object):
         metrics = self._get_attribute(DD_TYPE_METRIC)
         for metric in metrics:
             tdu_fields[metric] = 'VARCHAR(16)'
-        for owner_disc, owner_oid in owner_mappings.items():
+        for owner_desc, owner_oid in owner_mappings.items():
             tdu_table_name = self._get_table_name(TABLE_TYPE_TDU, owner_oid)
             DBHandler.init_table(tdu_table_name, tdu_fields)
-            raw_data = self._read_tdu_raw_data(owner_disc)
+            raw_data = self._read_tdu_raw_data(owner_desc)
             raw_data.rename(columns=metric_mappings, inplace=True)
             raw_data['timestamp'] = raw_data['timestamp'].apply(lambda x: moment(x).format('X.SSS')).astype('string')
             # raw_data['timestamp'] = raw_data['timestamp'].apply(lambda x: moment(x).format(TIMESTAMP_FORMAT)).astype('string')
@@ -805,18 +806,52 @@ class TDUProcessor(object):
         return self._metrics
 
 
-class DataDictionary(object):
+class DataUnit(object):
 
     def __init__(self, service_id: str):
         if PV_SERVICE.validate(KEY_SERVICE_ID, service_id):
             self._service_id = service_id
-            if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD)):
-                self._data = DBHandler.query(service_id, TABLE_TYPE_DD)
-            else:
-                DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD), FIELDS_DD)
-                self._data = DBHandler.query(service_id, TABLE_TYPE_DD)
         else:
-            raise ValueError(logger.error([5800]))
+            raise ValueError(logger.error([4500]))
+
+    @property
+    def service_id(self):
+        return self._service_id
+
+    @abstractmethod
+    def fields(self):
+        pass
+
+    @abstractmethod
+    def query(self, **kwargs):
+        pass
+
+    @abstractmethod
+    def add(self, **kwargs):
+        pass
+
+    @abstractmethod
+    def remove(self, **kwargs):
+        pass
+
+    @abstractmethod
+    def sync_db(self, filename, init_flag=False):
+        pass
+
+    @abstractmethod
+    def import_data(self, filename):
+        pass
+
+
+class DataDictionary(DataUnit):
+
+    def __init__(self, service_id: str):
+        super().__init__(service_id)
+        if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD)):
+            self._data = DBHandler.query(service_id, TABLE_TYPE_DD)
+        else:
+            DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD), FIELDS_DD)
+            self._data = DBHandler.query(service_id, TABLE_TYPE_DD)
 
     def sync_db(self, filename, init_flag=False):
         table_name = DBHandler.get_table_name(self._service_id, TABLE_TYPE_DD)
@@ -852,40 +887,18 @@ class DataDictionary(object):
         else:
             raise ValueError(logger.error([5802]))
 
-
-class DataUnit(object):
-
-    def __init__(self, service_id: str):
-        if PV_SERVICE.validate(KEY_SERVICE_ID, service_id):
-            self._service_id = service_id
-        else:
-            raise ValueError(logger.error([4500]))
-
-    @property
-    def service_id(self):
-        return self._service_id
-
-    @abstractmethod
     def fields(self):
-        pass
+        return FIELDS_DD
 
-    @abstractmethod
     def query(self, **kwargs):
-        pass
+        return self._data
 
-    @abstractmethod
     def add(self, **kwargs):
         pass
 
-    @abstractmethod
     def remove(self, **kwargs):
         pass
 
-    @abstractmethod
-    def sync_db(self, filename, init_flag=False):
-        pass
-
-    @abstractmethod
     def import_data(self, filename):
         pass
 

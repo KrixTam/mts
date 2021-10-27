@@ -37,7 +37,7 @@ DD_TYPE_TAG_VALUE = hex_str(4, 1)
 
 DD_TYPE = [DD_TYPE_OWNER, DD_TYPE_METRIC, DD_TYPE_TAG, DD_TYPE_TAG_VALUE]
 
-DD_HEADERS = 'ddid,disc,oid_mask'
+DD_HEADERS = 'ddid,desc,oid_mask'
 
 FILE_TYPE_DD = 'dd'
 FILE_TYPE_SDU = 'sdu'
@@ -57,7 +57,7 @@ FILE_EXT = {
     FILE_TYPE_TDU_RAW: '.rtdu'
 }
 
-FIELDS_DD = {'ddid': 'VARCHAR(17) PRIMARY KEY', 'disc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR(32)'}
+FIELDS_DD = {'ddid': 'VARCHAR(17) PRIMARY KEY', 'desc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR(32)'}
 
 CACHE_TTL_DEFAULT = timedelta(hours=12)
 CACHE_MAX_SIZE_DEFAULT = 30
@@ -97,7 +97,7 @@ PV_SERVICE = ParameterValidator({
     },
     'service_id': {
         'type': 'string',
-        'pattern': '[0-7]{2}',
+        'pattern': '[0-7]{2}'
     }
 })
 
@@ -105,6 +105,18 @@ PV_DB_DEFINITION = ParameterValidator({
     'field': {
         'type': 'object',
         'minProperties': 1
+    }
+})
+
+PV_DD_QUERY = ParameterValidator({
+    'dd_type': {
+        'type': 'string',
+        'pattern': '[0-9a-f]{1}'
+    },
+    'desc': {
+        'type': 'array',
+        'items': {'type': 'string'},
+        'minItems': 1
     }
 })
 

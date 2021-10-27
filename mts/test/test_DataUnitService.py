@@ -17,19 +17,19 @@ class TestDataUnitService(unittest.TestCase):
                 {
                     'name': '颜色',
                     'values': [
-                        {'disc': '红', 'owners': ['苹果', '西瓜']},
-                        {'disc': '黄', 'owners': ['梨', '香蕉']},
-                        {'disc': '绿', 'owners': ['梨', '苹果', '橘子', '橙子', '西瓜', '香蕉']},
-                        {'disc': '橙', 'owners': ['橘子', '橙子']},
-                        {'disc': '白', 'owners': []},
-                        {'disc': '紫', 'owners': ['山竹']}
+                        {'desc': '红', 'owners': ['苹果', '西瓜']},
+                        {'desc': '黄', 'owners': ['梨', '香蕉']},
+                        {'desc': '绿', 'owners': ['梨', '苹果', '橘子', '橙子', '西瓜', '香蕉']},
+                        {'desc': '橙', 'owners': ['橘子', '橙子']},
+                        {'desc': '白', 'owners': []},
+                        {'desc': '紫', 'owners': ['山竹']}
                     ]
                 },
                 {
                     'name': '货源',
                     'values': [
-                        {'disc': '国产', 'owners': ['苹果', '梨', '西瓜', '橘子', '橙子']},
-                        {'disc': '进口', 'owners': ['山竹', '香蕉']}
+                        {'desc': '国产', 'owners': ['苹果', '梨', '西瓜', '橘子', '橙子']},
+                        {'desc': '进口', 'owners': ['山竹', '香蕉']}
                     ]
                 },
             ]
@@ -41,14 +41,14 @@ class TestDataUnitService(unittest.TestCase):
         tags = []
         owners = settings['owners']
         owners.sort()
-        self.assertEqual(ds.disc(dd_type=DD_TYPE_OWNER), owners)
+        self.assertEqual(ds.desc(dd_type=DD_TYPE_OWNER), owners)
         metrics = settings['metrics']
         metrics.sort()
-        self.assertEqual(ds.disc(dd_type=DD_TYPE_METRIC), metrics)
+        self.assertEqual(ds.desc(dd_type=DD_TYPE_METRIC), metrics)
         for tag in settings['tags']:
             tags.append(tag['name'])
         tags.sort()
-        self.assertEqual(ds.disc(dd_type=DD_TYPE_TAG), tags)
+        self.assertEqual(ds.desc(dd_type=DD_TYPE_TAG), tags)
         owner_ids = DBHandler.query(ds.service_id, TABLE_TYPE_SDU, ['owner'])['owner'].tolist()
         owner_ids.sort()
         self.assertEqual(ds.owners, owner_ids)
@@ -63,13 +63,13 @@ class TestDataUnitService(unittest.TestCase):
         ds = DataUnitService(settings)
         owners = ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉']
         owners.sort()
-        self.assertEqual(ds.disc(dd_type=DD_TYPE_OWNER), owners)
+        self.assertEqual(ds.desc(dd_type=DD_TYPE_OWNER), owners)
         metrics = ['进货量/斤', '销量/斤']
         metrics.sort()
-        self.assertEqual(ds.disc(dd_type=DD_TYPE_METRIC), metrics)
+        self.assertEqual(ds.desc(dd_type=DD_TYPE_METRIC), metrics)
         tags = ['颜色', '货源']
         tags.sort()
-        self.assertEqual(ds.disc(dd_type=DD_TYPE_TAG), tags)
+        self.assertEqual(ds.desc(dd_type=DD_TYPE_TAG), tags)
         owner_ids = DBHandler.query(ds.service_id, TABLE_TYPE_SDU, ['owner'])['owner'].tolist()
         owner_ids.sort()
         self.assertEqual(ds.owners, owner_ids)

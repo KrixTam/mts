@@ -10,9 +10,9 @@ def hex_str(num, bits):
     else:
         return res[bits:]
 
-
-def get_timestamp(ori_data: str):
-    m = moment(ori_data).format('x')
+#
+# def get_timestamp(ori_data: str):
+#     m = moment(ori_data).format('x')
 
 # 1000-1999：DataUnitProcessor
 # 2000-2499：TimeDataUnit
@@ -56,7 +56,7 @@ ERROR_DEF = {
     '5704': '[{0}] get_table_name的参数service_id值异常。',
     # '5705': '[{0}] get_dd的参数service_id值异常。',
     '5706': '[{0}] get_table_name的参数owner_id值异常。',
-    '5800': '[{0}] 构建DataDictionary失败，service_id值异常。',
+    # '5800': '[{0}] 构建DataDictionary失败，service_id值异常。',
     '5801': '[{0}] 异常：未能识别的dd_type({1})。',
     '5802': '[{0}] query_dd的参数service_id值异常。',
 }

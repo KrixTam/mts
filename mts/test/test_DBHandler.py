@@ -32,12 +32,12 @@ class TestDBHandler(unittest.TestCase):
         DBHandler.import_data(dd_file_name, dd_table_name)
         df = DBHandler.query(service_id, TABLE_TYPE_DD)
         self.assertFalse(df.empty)
-        df = DBHandler.query(service_id, TABLE_TYPE_DD, ['disc', 'ddid'], "disc = '颜色'")
+        df = DBHandler.query(service_id, TABLE_TYPE_DD, ['desc', 'ddid'], "desc = '颜色'")
         self.assertEqual(df['ddid'][0], '3a4059507fd30c005')
         DBHandler.set_mode(DB_MODE_SD)
-        df_01 = DBHandler.query(service_id, TABLE_TYPE_DD, ['disc', 'ddid'], "disc = '颜色'")
+        df_01 = DBHandler.query(service_id, TABLE_TYPE_DD, ['desc', 'ddid'], "desc = '颜色'")
         self.assertEqual(df['ddid'][0], df_01['ddid'][0])
-        df_02 = DBHandler.query(service_id, TABLE_TYPE_DD, ['disc', 'ddid'], "disc = '苹果' OR disc = '香蕉'")
+        df_02 = DBHandler.query(service_id, TABLE_TYPE_DD, ['desc', 'ddid'], "desc = '苹果' OR desc = '香蕉'")
         self.assertEqual(len(df_02.index), 2)
 
     def test_init_table_and_get_fields_sd(self):
