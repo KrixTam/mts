@@ -57,6 +57,12 @@ FILE_EXT = {
     FILE_TYPE_TDU_RAW: '.rtdu'
 }
 
+FILE_EXT_BY_TABLE_TYPE = {
+    TABLE_TYPE_DD: '.dd',
+    TABLE_TYPE_SDU: '.sdu',
+    TABLE_TYPE_TDU: '.tdu'
+}
+
 FIELDS_DD = {'ddid': 'VARCHAR(17) PRIMARY KEY', 'desc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR(32)'}
 
 CACHE_TTL_DEFAULT = timedelta(hours=12)

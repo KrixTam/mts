@@ -1,5 +1,6 @@
 import os
 import unittest
+import pandas as pd
 from mts.core import DBHandler, DataDictionaryId
 from mts.const import *
 
@@ -80,6 +81,13 @@ class TestDBHandler(unittest.TestCase):
         DBHandler.add(data, dd_table_name)
         res = DBHandler.query(service_id, TABLE_TYPE_DD)
         self.assertEqual(res['ddid'][0], str(ddid))
+        # 测试导出功能
+        DBHandler.export_data(output_dir, service_id, TABLE_TYPE_DD)
+        file_des = os.path.join(output_dir, '54.dd')
+        df = pd.read_csv(file_des, dtype=str)
+        self.assertEqual(1, len(df.index))
+        self.assertEqual('测试项02', df['desc'][0])
+        self.assertEqual(str(ddid), df['ddid'][0])
 
     def test_add_column(self):
         service_id = '54'

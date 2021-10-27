@@ -426,7 +426,7 @@ class DBHandler(object):
         cursor.close()
 
     @staticmethod
-    def import_data(filename, table_name):
+    def import_data(filename: str, table_name: str):
         cursor = DBHandler.get_cursor()
         with open(filename, 'r') as fin:
             dr = csv.DictReader(fin)
@@ -436,6 +436,23 @@ class DBHandler(object):
             cursor.executemany(sql, to_db)
             DBHandler.commit()
         cursor.close()
+
+    @staticmethod
+    def export_data(output_dir: str, service_id: str, table_type: str, owner_id: str = None):
+        output_filename = None
+        if table_type == TABLE_TYPE_DD or table_type == TABLE_TYPE_SDU:
+            output_filename = service_id + FILE_EXT_BY_TABLE_TYPE[table_type]
+        else:
+            if table_type == TABLE_TYPE_TDU:
+                if owner_id is None:
+                    raise
+                else:
+                    output_filename = service_id + '_' + owner_id + FILE_EXT_BY_TABLE_TYPE[table_type]
+            else:
+                raise ValueError(logger.error([5705, table_type]))
+        output_filename = path.join(output_dir, output_filename)
+        df = DBHandler.query(service_id=service_id, table_type=table_type, owner_id=owner_id)
+        df.to_csv(output_filename, index=False)
 
     @staticmethod
     def get_table_name(service_id: str, table_type: str, owner_id: str = None):
@@ -874,6 +891,10 @@ class DataUnit(object):
     def import_data(self, filename):
         pass
 
+    @abstractmethod
+    def export_data(self, output_dir):
+        pass
+
 
 class DataDictionary(DataUnit):
 
@@ -975,6 +996,9 @@ class DataDictionary(DataUnit):
 
     def import_data(self, filename):
         pass
+
+    def export_data(self, output_dir):
+        DBHandler.export_data(output_dir, self.service_id, TABLE_TYPE_DD)
 
 
 class TimeDataUnit(DataUnit):
@@ -1083,6 +1107,9 @@ class TimeDataUnit(DataUnit):
     def import_data(self, filename):
         pass
 
+    def export_data(self, output_dir):
+        DBHandler.export_data(output_dir, self.service_id, TABLE_TYPE_TDU, self.oid)
+
 
 class SpaceDataUnit(DataUnit):
 
@@ -1124,3 +1151,6 @@ class SpaceDataUnit(DataUnit):
 
     def import_data(self, filename):
         pass
+
+    def export_data(self, output_dir):
+        DBHandler.export_data(output_dir, self.service_id, TABLE_TYPE_SDU)
