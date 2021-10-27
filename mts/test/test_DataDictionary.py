@@ -28,6 +28,12 @@ class TestDataDictionary(unittest.TestCase):
         with self.assertRaises(ValueError):
             DataDictionary.query_oid('52', 'bad')
 
+    def test_add(self):
+        service_id = '51'
+        dd = DataDictionary(service_id)
+        dd.add(dd_type=DD_TYPE_OWNER, desc='苹果', oid_mask='')
+        self.assertEqual(1, len(dd.query(True, desc=['苹果'])))
+
 
 if __name__ == '__main__':
     unittest.main()

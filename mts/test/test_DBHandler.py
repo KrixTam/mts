@@ -58,8 +58,8 @@ class TestDBHandler(unittest.TestCase):
         with self.assertRaises(ValueError):
             DBHandler.get_table_name(52, TABLE_TYPE_DD)
 
-    def test_add(self):
-        # DBHandler.set_mode(DB_MODE_SD)
+    def test_add_01(self):
+        DBHandler.set_mode(DB_MODE_SD)
         service_id = '53'
         sc = int(service_id, 8)
         ddid = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_code=sc)
@@ -69,6 +69,18 @@ class TestDBHandler(unittest.TestCase):
         DBHandler.add(data, dd_table_name)
         res = DBHandler.query(service_id, TABLE_TYPE_DD)
         self.assertEqual(res['ddid'][0], str(ddid))
+
+    def test_add_02(self):
+        DBHandler.set_mode(DB_MODE_CX)
+        service_id = '54'
+        ddid = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_id=service_id)
+        data = {'ddid': str(ddid), 'desc': '测试项02', 'oid_mask': ''}
+        dd_table_name = DBHandler.get_table_name(service_id, TABLE_TYPE_DD)
+        DBHandler.init_table(dd_table_name, FIELDS_DD)
+        DBHandler.add(data, dd_table_name)
+        res = DBHandler.query(service_id, TABLE_TYPE_DD)
+        self.assertEqual(res['ddid'][0], str(ddid))
+
 
 
 if __name__ == '__main__':

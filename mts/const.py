@@ -35,7 +35,7 @@ DD_TYPE_METRIC = hex_str(2, 1)
 DD_TYPE_TAG = hex_str(3, 1)
 DD_TYPE_TAG_VALUE = hex_str(4, 1)
 
-DD_TYPE = [DD_TYPE_OWNER, DD_TYPE_METRIC, DD_TYPE_TAG, DD_TYPE_TAG_VALUE]
+DD_TYPES = [DD_TYPE_OWNER, DD_TYPE_METRIC, DD_TYPE_TAG, DD_TYPE_TAG_VALUE]
 
 DD_HEADERS = 'ddid,desc,oid_mask'
 
@@ -82,6 +82,16 @@ OID = {
     'pattern': '[a-f0-9]{16}'
 }
 
+DESC = {
+    'type': 'string',
+    'maxLength': 160
+}
+
+DD_TYPE = {
+    'type': 'string',
+    'pattern': '[0-9a-f]{1}'
+}
+
 PV_ID = ParameterValidator({
     'oid': OID,
     'ddid': {
@@ -113,14 +123,20 @@ PV_DB_DEFINITION = ParameterValidator({
 })
 
 PV_DD_QUERY = ParameterValidator({
-    'dd_type': {
-        'type': 'string',
-        'pattern': '[0-9a-f]{1}'
-    },
+    'dd_type': DD_TYPE,
     'desc': {
         'type': 'array',
-        'items': {'type': 'string'},
+        'items': DESC,
         'minItems': 1
+    }
+})
+
+PV_DD_ADD = ParameterValidator({
+    'dd_type': DD_TYPE,
+    'desc': DESC,
+    'oid_mask': {
+        'type': 'string',
+        'pattern': '[a-f0-9]{0,32}'
     }
 })
 

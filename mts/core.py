@@ -180,12 +180,21 @@ class DataDictionaryId(object):
                     dd_type = int(dd_type, 16)
                 self._id = DataDictionaryId.pack(dd_type, kwargs[KEY_OID])
             else:
-                if (KEY_DD_TYPE in kwargs) and ('service_code' in kwargs):
-                    dd_type = kwargs[KEY_DD_TYPE]
-                    if isinstance(dd_type, str) and dd_type in DD_TYPE:
-                        dd_type = int(dd_type, 16)
-                    oid = ObjectId(service_code=kwargs['service_code'])
-                    self._id = DataDictionaryId.pack(dd_type, oid.value)
+                if KEY_DD_TYPE in kwargs:
+                    sc = None
+                    if 'service_code' in kwargs:
+                        sc = kwargs['service_code']
+                    else:
+                        if 'service_id' in kwargs:
+                            sc = int(kwargs['service_id'], 8)
+                    if sc is None:
+                        raise ValueError(logger.error([5601, kwargs]))
+                    else:
+                        dd_type = kwargs[KEY_DD_TYPE]
+                        if isinstance(dd_type, str) and dd_type in DD_TYPES:
+                            dd_type = int(dd_type, 16)
+                        oid = ObjectId(service_code=sc)
+                        self._id = DataDictionaryId.pack(dd_type, oid.value)
                 else:
                     raise ValueError(logger.error([5601, kwargs]))
 
@@ -229,7 +238,7 @@ class DataDictionaryId(object):
 
     @staticmethod
     def _validate(dd_type: int, oid: int):
-        if ObjectId.validate(oid) and hex_str(dd_type, 1) in DD_TYPE:
+        if ObjectId.validate(oid) and hex_str(dd_type, 1) in DD_TYPES:
             return True
         else:
             return False
@@ -889,7 +898,7 @@ class DataDictionary(DataUnit):
     @staticmethod
     def query_dd(service_id: str, dd_type: str):
         if PV_SERVICE.validate(KEY_SERVICE_ID, service_id):
-            if dd_type in DD_TYPE:
+            if dd_type in DD_TYPES:
                 data = DBHandler.query(service_id, TABLE_TYPE_DD)
                 res = data[data[FIELD_DDID].str[0] == dd_type]
                 return res
@@ -902,33 +911,41 @@ class DataDictionary(DataUnit):
         return FIELDS_DD
 
     def query(self, oid_only=False, **kwargs):
+        res = self._data.copy()
         if KEY_DD_TYPE in kwargs:
             if PV_DD_QUERY.validate(KEY_DD_TYPE, kwargs[KEY_DD_TYPE]):
-                if kwargs[KEY_DD_TYPE] in DD_TYPE:
-                    res = self._data[self._data[FIELD_DDID].str[0] == kwargs[KEY_DD_TYPE]]
-                    if oid_only:
-                        res = res[FIELD_DDID].apply(lambda x: x[1:]).tolist()
-                        res.sort()
-                    return res
+                if kwargs[KEY_DD_TYPE] in DD_TYPES:
+                    res = res[res[FIELD_DDID].str[0] == kwargs[KEY_DD_TYPE]]
                 else:
                     raise ValueError(logger.error([5801, kwargs[KEY_DD_TYPE]]))
             else:
                 raise ValueError(logger.error([5800, kwargs[KEY_DD_TYPE]]))
-        else:
-            if 'desc' in kwargs:
-                if PV_DD_QUERY.validate('desc', kwargs['desc']):
-                    res = self._data[self._data['desc'].isin(kwargs['desc'])]
-                    if oid_only:
-                        res = res[FIELD_DDID].apply(lambda x: x[1:]).tolist()
-                        res.sort()
-                    return res
-                else:
-                    raise ValueError(logger.error([5803]))
+        if 'desc' in kwargs:
+            if PV_DD_QUERY.validate('desc', kwargs['desc']):
+                res = res[res['desc'].isin(kwargs['desc'])]
             else:
-                return self._data
+                raise ValueError(logger.error([5803]))
+        if oid_only:
+            res = res[FIELD_DDID].apply(lambda x: x[1:]).tolist()
+            res.sort()
+        return res
 
     def add(self, **kwargs):
-        pass
+        if PV_DD_ADD.validates(kwargs):
+            duplicated = True
+            res = self.query(dd_type=kwargs[KEY_DD_TYPE], desc=[kwargs['desc']])
+            if res.empty:
+                duplicated = False
+            if duplicated:
+                logger.warning([5804, kwargs])
+            else:
+                ddid = str(DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=self.service_id))
+                data = {'ddid': ddid, 'desc': kwargs['desc'], 'oid_mask': kwargs['oid_mask']}
+                dd_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_DD)
+                DBHandler.add(data, dd_table_name)
+                self._data = DBHandler.query(self.service_id, TABLE_TYPE_DD)
+        else:
+            raise ValueError(logger.error([5805, kwargs]))
 
     def remove(self, **kwargs):
         pass
