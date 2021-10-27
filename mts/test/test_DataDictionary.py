@@ -22,6 +22,7 @@ class TestDataDictionary(unittest.TestCase):
         dd.sync_db(dd_file_name, True)
         self.assertEqual(dd.get_oid(DD_TYPE_METRIC), ['a4059507fd30c003', 'a4059507fd30c004'])
         self.assertEqual(dd.get_oid(DD_TYPE_METRIC), DataDictionary.query_oid(service_id, DD_TYPE_METRIC))
+        self.assertEqual(dd.get_oid(DD_TYPE_METRIC), dd.query(True, desc=['进货量/斤', '销量/斤']))
 
     def test_error_query_oid(self):
         with self.assertRaises(ValueError):

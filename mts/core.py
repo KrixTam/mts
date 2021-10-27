@@ -167,21 +167,21 @@ class DataDictionaryId(object):
     __slots__ = ('_id',)
 
     def __init__(self, **kwargs):
-        if 'ddid' in kwargs:
-            ddid = kwargs['ddid']
+        if KEY_DDID in kwargs:
+            ddid = kwargs[KEY_DDID]
             if isinstance(ddid, DataDictionaryId) or isinstance(ddid, str):
                 self._generate(ddid)
             else:
                 raise TypeError(logger.error([5600, type(ddid)]))
         else:
-            if ('oid' in kwargs) and ('dd_type' in kwargs):
-                dd_type = kwargs['dd_type']
+            if (KEY_OID in kwargs) and (KEY_DD_TYPE in kwargs):
+                dd_type = kwargs[KEY_DD_TYPE]
                 if isinstance(dd_type, str):
                     dd_type = int(dd_type, 16)
-                self._id = DataDictionaryId.pack(dd_type, kwargs['oid'])
+                self._id = DataDictionaryId.pack(dd_type, kwargs[KEY_OID])
             else:
-                if 'dd_type' in kwargs and 'service_code' in kwargs:
-                    dd_type = kwargs['dd_type']
+                if (KEY_DD_TYPE in kwargs) and ('service_code' in kwargs):
+                    dd_type = kwargs[KEY_DD_TYPE]
                     if isinstance(dd_type, str) and dd_type in DD_TYPE:
                         dd_type = int(dd_type, 16)
                     oid = ObjectId(service_code=kwargs['service_code'])
@@ -417,7 +417,7 @@ class DBHandler(object):
                         if owner_id is None:
                             raise ValueError(logger.error([5702]))
                         else:
-                            if PV_ID.validate('oid', owner_id):
+                            if PV_ID.validate(KEY_OID, owner_id):
                                 return 'tdu_' + service_id + '_' + owner_id
                             else:
                                 raise ValueError(logger.error([5706]))
@@ -573,8 +573,8 @@ class DataUnitService(object):
         return int(self.service_id, 8)
 
     def _get_attribute(self, dd_type):
-        data = self._dd[self._dd['ddid'].str[0] == dd_type]
-        res = data['ddid'].str[1:].tolist()
+        data = self._dd[self._dd[KEY_DDID].str[0] == dd_type]
+        res = data[KEY_DDID].str[1:].tolist()
         res.sort()
         return res
 
@@ -598,15 +598,15 @@ class DataUnitService(object):
                 if oid is None:
                     pass
                 else:
-                    data = self._dd[self._dd['ddid'].str[1:] == oid]
+                    data = self._dd[self._dd[KEY_DDID].str[1:] == oid]
             else:
                 if oid is None:
-                    data = self._dd[self._dd['ddid'].str[0] == dd_type]
+                    data = self._dd[self._dd[KEY_DDID].str[0] == dd_type]
                 else:
                     ddid_val = dd_type + oid
-                    data = self._dd[self._dd['ddid'] == ddid_val]
+                    data = self._dd[self._dd[KEY_DDID] == ddid_val]
         else:
-            data = self._dd[self._dd['ddid'] == ddid]
+            data = self._dd[self._dd[KEY_DDID] == ddid]
         res = data['desc'].values.tolist()
         res.sort()
         return res
@@ -861,12 +861,7 @@ class DataDictionary(DataUnit):
         self._data = DBHandler.query(self._service_id, TABLE_TYPE_DD)
 
     def get_oid(self, dd_type: str):
-        if dd_type in DD_TYPE:
-            res = self._data[self._data[FIELD_DDID].str[0] == dd_type][FIELD_DDID].apply(lambda x: x[1:]).tolist()
-            res.sort()
-            return res
-        else:
-            raise ValueError(logger.error([5801, dd_type]))
+        return self.query(True, dd_type=dd_type)
 
     @staticmethod
     def query_oid(service_id: str, dd_type: str):
@@ -890,8 +885,31 @@ class DataDictionary(DataUnit):
     def fields(self):
         return FIELDS_DD
 
-    def query(self, **kwargs):
-        return self._data
+    def query(self, oid_only=False, **kwargs):
+        if KEY_DD_TYPE in kwargs:
+            if PV_DD_QUERY.validate(KEY_DD_TYPE, kwargs[KEY_DD_TYPE]):
+                if kwargs[KEY_DD_TYPE] in DD_TYPE:
+                    res = self._data[self._data[FIELD_DDID].str[0] == kwargs[KEY_DD_TYPE]]
+                    if oid_only:
+                        res = res[FIELD_DDID].apply(lambda x: x[1:]).tolist()
+                        res.sort()
+                    return res
+                else:
+                    raise ValueError(logger.error([5801, kwargs[KEY_DD_TYPE]]))
+            else:
+                raise ValueError(logger.error([5800, kwargs[KEY_DD_TYPE]]))
+        else:
+            if 'desc' in kwargs:
+                if PV_DD_QUERY.validate('desc', kwargs['desc']):
+                    res = self._data[self._data['desc'].isin(kwargs['desc'])]
+                    if oid_only:
+                        res = res[FIELD_DDID].apply(lambda x: x[1:]).tolist()
+                        res.sort()
+                    return res
+                else:
+                    raise ValueError(logger.error([5803]))
+            else:
+                return self._data
 
     def add(self, **kwargs):
         pass
@@ -930,8 +948,8 @@ class TimeDataUnit(DataUnit):
         if PV_TDU_QUERY.validates(kwargs):
             fields = None
             res = None
-            if ('metric' in kwargs) and (len(kwargs['metric']) > 0):
-                fields = kwargs['metric'].copy()
+            if (KEY_METRIC in kwargs) and (len(kwargs[KEY_METRIC]) > 0):
+                fields = kwargs[KEY_METRIC].copy()
                 fields.append(FIELD_TIMESTAMP)
             condition = None
             if 'interval' in kwargs:
@@ -958,7 +976,7 @@ class TimeDataUnit(DataUnit):
                 if fields is None:
                     res[self._metric] = res[self._metric].apply(pd.to_numeric)
                 else:
-                    res[kwargs['metric']] = res[kwargs['metric']].apply(pd.to_numeric)
+                    res[kwargs[KEY_METRIC]] = res[kwargs[KEY_METRIC]].apply(pd.to_numeric)
                 return res
         else:
             raise ValueError(logger.error([2000]))
@@ -996,11 +1014,11 @@ class SpaceDataUnit(DataUnit):
         self._tags = []
         self._tag_definition = {}
         for index, row in dd_tag.iterrows():
-            tag_oid = row['ddid'][1:]
+            tag_oid = row[KEY_DDID][1:]
             self._tag_definition[tag_oid] = {}
             self._tags.append(tag_oid)
         for index, row in dd_tag_value.iterrows():
-            tag_value_oid = row['ddid'][1:]
+            tag_value_oid = row[KEY_DDID][1:]
             tag_oid = row['oid_mask'][:16]
             tag_value_mask = row['oid_mask'][16:]
             self._tag_definition[tag_oid][tag_value_oid] = tag_value_mask

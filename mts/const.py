@@ -65,7 +65,11 @@ CACHE_MAX_SIZE_DEFAULT = 30
 MOMENT_FORMAT = 'X.SSS'
 
 KEY_OID = 'oid'
+KEY_DDID = 'ddid'
 KEY_SERVICE_ID = 'service_id'
+KEY_SERVICE_CODE = 'service_code'
+KEY_DD_TYPE = 'dd_type'
+KEY_METRIC = 'metric'
 
 FIELD_DDID = 'ddid'
 FIELD_TIMESTAMP = 'timestamp'

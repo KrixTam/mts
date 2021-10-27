@@ -56,9 +56,10 @@ ERROR_DEF = {
     '5704': '[{0}] get_table_name的参数service_id值异常。',
     # '5705': '[{0}] get_dd的参数service_id值异常。',
     '5706': '[{0}] get_table_name的参数owner_id值异常。',
-    # '5800': '[{0}] 构建DataDictionary失败，service_id值异常。',
+    '5800': '[{0}] query的参数dd_type值异常。',
     '5801': '[{0}] 异常：未能识别的dd_type({1})。',
     '5802': '[{0}] query_dd的参数service_id值异常。',
+    '5803': '[{0}] query的参数desc值异常。',
 }
 
 logger = Logger(ERROR_DEF, 'mts')
