@@ -81,6 +81,13 @@ class TestDBHandler(unittest.TestCase):
         res = DBHandler.query(service_id, TABLE_TYPE_DD)
         self.assertEqual(res['ddid'][0], str(ddid))
 
+    def test_add_column(self):
+        service_id = '54'
+        dd_table_name = DBHandler.get_table_name(service_id, TABLE_TYPE_DD)
+        DBHandler.init_table(dd_table_name, FIELDS_DD)
+        self.assertFalse('abc' in DBHandler.get_fields(dd_table_name))
+        DBHandler.add_column(dd_table_name, 'abc', 'REAL')
+        self.assertTrue('abc' in DBHandler.get_fields(dd_table_name))
 
 
 if __name__ == '__main__':

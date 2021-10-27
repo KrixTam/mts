@@ -34,6 +34,14 @@ class TestDataDictionary(unittest.TestCase):
         dd.add(dd_type=DD_TYPE_OWNER, desc='苹果', oid_mask='')
         self.assertEqual(1, len(dd.query(True, desc=['苹果'])))
 
+    def test_append(self):
+        service_id = '55'
+        dd = DataDictionary(service_id)
+        self.assertTrue(dd.query().empty)
+        DataDictionary.append(service_id=service_id, dd_type=DD_TYPE_OWNER, desc='苹果', oid_mask='')
+        dd.reload()
+        self.assertFalse(dd.query().empty)
+
 
 if __name__ == '__main__':
     unittest.main()

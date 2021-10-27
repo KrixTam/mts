@@ -52,12 +52,15 @@ class TestTimeDataUnit(unittest.TestCase):
         self.assertEqual(df_04['a4059507fd30c003'].loc[a], df_04['a4059507fd30c003'].loc[a])
         # add一个记录
         tdu.add(ts='2021-3-17', data={'进货量/斤': 123, '转售额/斤': 40})
+        dd.reload()
         df_05 = tdu.query(interval={'from': '2021-02-15', 'to': '2021-04-15'})
         self.assertEqual(3, len(df_05.index))
         df_06 = tdu.query(any=['2021-03-17'])
         # logger.log(df_06)
         self.assertEqual(1, len(df_06.index))
         self.assertEqual(123, df_06['a4059507fd30c003'][0])
+        new_metric = dd.query(True, desc=['转售额/斤'])[0]
+        self.assertEqual(40, df_06[new_metric][0])
 
 
 if __name__ == '__main__':

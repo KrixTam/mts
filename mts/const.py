@@ -103,16 +103,18 @@ PV_ID = ParameterValidator({
 SERVICE_CODE_MIN = int('101000', 2)
 SERVICE_CODE_MAX = int('111111', 2)
 
+SERVICE_ID = {
+    'type': 'string',
+    'pattern': '[0-7]{2}'
+}
+
 PV_SERVICE = ParameterValidator({
     'service_code': {
         'type': 'integer',
         'minimum': SERVICE_CODE_MIN,
         'maximum': SERVICE_CODE_MAX
     },
-    'service_id': {
-        'type': 'string',
-        'pattern': '[0-7]{2}'
-    }
+    'service_id': SERVICE_ID
 })
 
 PV_DB_DEFINITION = ParameterValidator({
@@ -132,6 +134,16 @@ PV_DD_QUERY = ParameterValidator({
 })
 
 PV_DD_ADD = ParameterValidator({
+    'dd_type': DD_TYPE,
+    'desc': DESC,
+    'oid_mask': {
+        'type': 'string',
+        'pattern': '[a-f0-9]{0,32}'
+    }
+})
+
+PV_DD_APPEND = ParameterValidator({
+    'service_id': SERVICE_ID,
     'dd_type': DD_TYPE,
     'desc': DESC,
     'oid_mask': {

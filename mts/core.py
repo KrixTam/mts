@@ -313,7 +313,7 @@ class DBHandler(object):
         DBHandler._mode = mode
 
     @staticmethod
-    def register(db_url):
+    def register(db_url: str):
         DBHandler._db_url = db_url
 
     @staticmethod
@@ -374,7 +374,7 @@ class DBHandler(object):
         return tables
 
     @staticmethod
-    def exist_table(table_name):
+    def exist_table(table_name: str):
         return table_name in DBHandler.get_tables()
 
     @staticmethod
@@ -385,16 +385,16 @@ class DBHandler(object):
             if PV_DB_DEFINITION.validate('field', fields):
                 cursor = DBHandler.get_cursor()
                 # 如果存在table，先drop掉
-                sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + table_name + "'"
+                sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{}'".format(table_name)
                 cursor.execute(sql)
                 if cursor.fetchone()[0] == 1:
-                    sql = "DROP TABLE " + table_name
+                    sql = "DROP TABLE {}".format(table_name)
                     cursor.execute(sql)
                 # 创建table
                 fields_def = []
                 for key, value in fields.items():
                     fields_def.append('[' + key + '] ' + value)
-                sql = "CREATE TABLE IF NOT EXISTS " + table_name + "(" + ", ".join(fields_def) + ")"
+                sql = "CREATE TABLE IF NOT EXISTS {}({})".format(table_name, ", ".join(fields_def))
                 cursor.execute(sql)
                 DBHandler.commit()
                 cursor.close()
@@ -402,7 +402,7 @@ class DBHandler(object):
                 raise ValueError(logger.error([5703]))
 
     @staticmethod
-    def add(data: dict, table_name):
+    def add(data: dict, table_name: str):
         cursor = DBHandler.get_cursor()
         keys = []
         values = []
@@ -411,8 +411,16 @@ class DBHandler(object):
             values.append(str(value))
         columns = ', '.join(keys)
         values = "', '".join(values)
-        sql = "INSERT OR IGNORE INTO " + table_name + " ({}) VALUES ('{}');".format(columns, values)
+        sql = "INSERT OR IGNORE INTO {} ({}) VALUES ('{}');".format(table_name, columns, values)
         # logger.log(sql)
+        cursor.execute(sql)
+        DBHandler.commit()
+        cursor.close()
+
+    @staticmethod
+    def add_column(table_name: str, field_name: str, field_def: str):
+        cursor = DBHandler.get_cursor()
+        sql = "ALTER TABLE {} ADD COLUMN {} {};".format(table_name, field_name, field_def)
         cursor.execute(sql)
         DBHandler.commit()
         cursor.close()
@@ -871,18 +879,22 @@ class DataDictionary(DataUnit):
 
     def __init__(self, service_id: str):
         super().__init__(service_id)
+        self._data = None
         if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD)):
-            self._data = DBHandler.query(service_id, TABLE_TYPE_DD)
+            pass
         else:
             DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD), FIELDS_DD)
-            self._data = DBHandler.query(service_id, TABLE_TYPE_DD)
+        self.reload()
+
+    def reload(self):
+        self._data = DBHandler.query(self._service_id, TABLE_TYPE_DD)
 
     def sync_db(self, filename, init_flag=False):
         table_name = DBHandler.get_table_name(self._service_id, TABLE_TYPE_DD)
         if init_flag:
             DBHandler.init_table(table_name, FIELDS_DD)
         DBHandler.import_data(filename, table_name)
-        self._data = DBHandler.query(self._service_id, TABLE_TYPE_DD)
+        self.reload()
 
     def get_oid(self, dd_type: str):
         return self.query(True, dd_type=dd_type)
@@ -942,9 +954,21 @@ class DataDictionary(DataUnit):
                 data = {'ddid': ddid, 'desc': kwargs['desc'], 'oid_mask': kwargs['oid_mask']}
                 dd_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_DD)
                 DBHandler.add(data, dd_table_name)
-                self._data = DBHandler.query(self.service_id, TABLE_TYPE_DD)
+                self.reload()
         else:
             raise ValueError(logger.error([5805, kwargs]))
+
+    @staticmethod
+    def append(**kwargs):
+        if PV_DD_APPEND.validates(kwargs):
+            sid = kwargs[KEY_SERVICE_ID]
+            ddid = str(DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=sid))
+            data = {'ddid': ddid, 'desc': kwargs['desc'], 'oid_mask': kwargs['oid_mask']}
+            dd_table_name = DBHandler.get_table_name(sid, TABLE_TYPE_DD)
+            DBHandler.add(data, dd_table_name)
+            return ddid
+        else:
+            raise ValueError(logger.error([5806, kwargs]))
 
     def remove(self, **kwargs):
         pass
@@ -1029,12 +1053,17 @@ class TimeDataUnit(DataUnit):
     def add(self, **kwargs):
         if PV_TDU_ADD.validates(kwargs):
             data = {}
+            tdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_TDU, self.oid)
             for key, value in kwargs['data'].items():
                 if key in self._desc:
                     data[self._desc[key]] = value
                 else:
-                    # TODO 增加metric？
-                    pass
+                    ddid = DataDictionary.append(service_id=self.service_id, dd_type=DD_TYPE_METRIC, desc=key, oid_mask='')
+                    metric_id = ddid[1:]
+                    DBHandler.add_column(tdu_table_name, metric_id, 'VARCHAR(16)')
+                    self._desc[key] = metric_id
+                    self._metric.append(metric_id)
+                    data[metric_id] = value
             data[FIELD_TIMESTAMP] = moment(kwargs['ts']).format('X.SSS')
             tdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_TDU, self.oid)
             DBHandler.add(data, tdu_table_name)
