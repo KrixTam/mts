@@ -4,26 +4,26 @@ import unittest
 from mts.const import *
 from mts.core import TimeDataUnit, DBHandler, DataDictionary
 from mts.utils import logger
-from moment import moment
-import pandas as pd
-
-output_dir = os.path.join(os.getcwd(), 'output')
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-db_file_name = os.path.join(os.getcwd(), 'output', 'tdu')
-db_url = 'sqlite://' + db_file_name
-if os.path.exists(db_file_name):
-    os.remove(db_file_name)
-DBHandler.register(db_url)
 
 
 class TestTimeDataUnit(unittest.TestCase):
-    def test_default(self):
-        # 创建tdu
-        service_id = '51'
-        dd = DataDictionary(service_id)
+    @classmethod
+    def setUpClass(cls):
+        output_dir = os.path.join(os.getcwd(), 'output')
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        db_file_name = os.path.join(os.getcwd(), 'output', 'tdu')
+        db_url = 'sqlite://' + db_file_name
+        if os.path.exists(db_file_name):
+            os.remove(db_file_name)
+        DBHandler.register(db_url)
+        dd = DataDictionary('51')
         dd_file_name = os.path.join(os.getcwd(), 'resources', 'ds', '51.dd')
         dd.sync_db(dd_file_name, True)
+
+    def test_01(self):
+        # 创建tdu
+        service_id = '51'
         tdu = TimeDataUnit(service_id, 'a405ac45493b2000')
         # logger.log(tdu._metric)
         df = tdu.query()
@@ -33,6 +33,12 @@ class TestTimeDataUnit(unittest.TestCase):
         tdu.sync_db(filename, True)
         # 重复sync测试
         tdu.sync_db(filename)
+        self.assertTrue(True)
+
+    def test_02(self):
+        # 创建tdu
+        service_id = '51'
+        tdu = TimeDataUnit(service_id, 'a405ac45493b2000')
         # 常规无条件限制下的query测试
         df_01 = tdu.query()
         a = TimeDataUnit.to_date('1617120000.000')
@@ -49,7 +55,13 @@ class TestTimeDataUnit(unittest.TestCase):
         # query中带有interval的测试
         df_04 = tdu.query(interval={'from': '2021-02-15', 'to': '2021-04-15'})
         self.assertEqual(2, len(df_04.index))
-        self.assertEqual(df_04['a4059507fd30c003'].loc[a], df_04['a4059507fd30c003'].loc[a])
+        self.assertEqual(df_03['a4059507fd30c003'].loc[a], df_04['a4059507fd30c003'].loc[a])
+
+    def test_03(self):
+        # 创建tdu
+        service_id = '51'
+        tdu = TimeDataUnit(service_id, 'a405ac45493b2000')
+        dd = DataDictionary(service_id)
         # add一个记录
         tdu.add(ts='2021-3-17', data={'进货量/斤': 123, '转售额/斤': 40})
         dd.reload()

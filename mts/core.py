@@ -992,9 +992,11 @@ class DataDictionary(DataUnit):
             raise ValueError(logger.error([5806, kwargs]))
 
     def remove(self, **kwargs):
+        # TODO 待实现
         pass
 
     def import_data(self, filename):
+        # TODO 待实现
         pass
 
     def export_data(self, output_dir):
@@ -1095,6 +1097,7 @@ class TimeDataUnit(DataUnit):
             logger.warning([2001])
 
     def remove(self, **kwargs):
+        # TODO 待实现
         pass
 
     def sync_db(self, filename, init_flag=False):
@@ -1105,6 +1108,7 @@ class TimeDataUnit(DataUnit):
         DBHandler.import_data(filename, table_name)
 
     def import_data(self, filename):
+        # TODO 待实现
         pass
 
     def export_data(self, output_dir):
@@ -1129,13 +1133,21 @@ class SpaceDataUnit(DataUnit):
             tag_value_mask = row['oid_mask'][16:]
             self._tag_definition[tag_oid][tag_value_oid] = tag_value_mask
         self._tags.sort()
+        if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_SDU)):
+            pass
+        else:
+            DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_SDU), self.fields())
+        self._data = DBHandler.query(self.service_id, TABLE_TYPE_SDU)
 
     @property
     def tags(self):
         return self._tags
 
     def fields(self):
-        pass
+        fields = {'owner': 'VARCHAR(16) PRIMARY KEY'}
+        for tag in self._tags:
+            fields[tag] = 'INT'
+        return fields
 
     def query(self, **kwargs):
         pass
@@ -1144,12 +1156,14 @@ class SpaceDataUnit(DataUnit):
         pass
 
     def remove(self, **kwargs):
+        # TODO 待实现
         pass
 
     def sync_db(self, filename, init_flag=False):
         pass
 
     def import_data(self, filename):
+        # TODO 待实现
         pass
 
     def export_data(self, output_dir):

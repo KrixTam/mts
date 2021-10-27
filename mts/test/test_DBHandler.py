@@ -5,16 +5,19 @@ from mts.core import DBHandler, DataDictionaryId
 from mts.const import *
 
 output_dir = os.path.join(os.getcwd(), 'output')
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-db_file_name = os.path.join(os.getcwd(), 'output', 'dbhandler')
-db_url = 'sqlite://' + db_file_name
-if os.path.exists(db_file_name):
-    os.remove(db_file_name)
-DBHandler.register(db_url)
 
 
 class TestDBHandler(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        db_file_name = os.path.join(os.getcwd(), 'output', 'dbhandler')
+        db_url = 'sqlite://' + db_file_name
+        if os.path.exists(db_file_name):
+            os.remove(db_file_name)
+        DBHandler.register(db_url)
+
     def test_all_cx(self):
         service_id = '51'
         DBHandler.set_mode(DB_MODE_CX)
