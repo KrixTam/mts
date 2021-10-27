@@ -393,6 +393,22 @@ class DBHandler(object):
                 raise ValueError(logger.error([5703]))
 
     @staticmethod
+    def add(data: dict, table_name):
+        cursor = DBHandler.get_cursor()
+        keys = []
+        values = []
+        for key, value in data.items():
+            keys.append(key)
+            values.append(value)
+        columns = ', '.join(keys)
+        values = "', '".join(values)
+        sql = "INSERT OR IGNORE INTO " + table_name + " ({}) VALUES ('{}');".format(columns, values)
+        # logger.log(sql)
+        cursor.execute(sql)
+        DBHandler.commit()
+        cursor.close()
+
+    @staticmethod
     def import_data(filename, table_name):
         cursor = DBHandler.get_cursor()
         with open(filename, 'r') as fin:

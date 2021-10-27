@@ -1,6 +1,6 @@
 import os
 import unittest
-from mts.core import DBHandler
+from mts.core import DBHandler, DataDictionaryId
 from mts.const import *
 
 output_dir = os.path.join(os.getcwd(), 'output')
@@ -57,6 +57,18 @@ class TestDBHandler(unittest.TestCase):
     def test_error(self):
         with self.assertRaises(ValueError):
             DBHandler.get_table_name(52, TABLE_TYPE_DD)
+
+    def test_add(self):
+        # DBHandler.set_mode(DB_MODE_SD)
+        service_id = '53'
+        sc = int(service_id, 8)
+        ddid = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_code=sc)
+        data = {'ddid': str(ddid), 'desc': '测试项', 'oid_mask': ''}
+        dd_table_name = DBHandler.get_table_name(service_id, TABLE_TYPE_DD)
+        DBHandler.init_table(dd_table_name, FIELDS_DD)
+        DBHandler.add(data, dd_table_name)
+        res = DBHandler.query(service_id, TABLE_TYPE_DD)
+        self.assertEqual(res['ddid'][0], str(ddid))
 
 
 if __name__ == '__main__':
