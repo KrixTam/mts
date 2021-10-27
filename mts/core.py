@@ -408,7 +408,7 @@ class DBHandler(object):
         values = []
         for key, value in data.items():
             keys.append(key)
-            values.append(value)
+            values.append(str(value))
         columns = ', '.join(keys)
         values = "', '".join(values)
         sql = "INSERT OR IGNORE INTO " + table_name + " ({}) VALUES ('{}');".format(columns, values)
@@ -617,7 +617,6 @@ class DataUnitService(object):
 
     def desc(self, ddid: str = None, dd_type: str = None, oid: str = None):
         data = self._dd
-        logger.log((data))
         if ddid is None:
             if dd_type is None:
                 if oid is None:
@@ -967,8 +966,17 @@ class TimeDataUnit(DataUnit):
                 self._metric = DataDictionary.query_oid(service_id, DD_TYPE_METRIC)
                 tdu_fields = self.fields()
                 DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id), tdu_fields)
+            self._desc = {}
+            data = DataDictionary.query_dd(service_id, DD_TYPE_METRIC)
+            for index, row in data.iterrows():
+                # logger.log(row)
+                self._desc[row['desc']] = row[KEY_DDID][1:]
         else:
             raise ValueError(logger.error([4500]))
+
+    @property
+    def oid(self):
+        return self._owner_id
 
     def fields(self):
         fields = {FIELD_TIMESTAMP: 'VARCHAR(16) PRIMARY KEY'}  # String of Unix Millisecond Timestamp
@@ -998,7 +1006,7 @@ class TimeDataUnit(DataUnit):
                         claus.append(c.format(*[moment(item).format(MOMENT_FORMAT)]))
                     condition = ' OR '.join(claus)
             try:
-                res = DBHandler.query(self._service_id, TABLE_TYPE_TDU, fields, condition, self._owner_id)
+                res = DBHandler.query(self._service_id, TABLE_TYPE_TDU, fields, condition, self.oid)
             except (DatabaseError, RuntimeError):
                 logger.error([2003])
                 res = pd.DataFrame(columns=self.fields().keys())
@@ -1020,7 +1028,16 @@ class TimeDataUnit(DataUnit):
 
     def add(self, **kwargs):
         if PV_TDU_ADD.validates(kwargs):
-            pass
+            data = {}
+            for key, value in kwargs['data'].items():
+                if key in self._desc:
+                    data[self._desc[key]] = value
+                else:
+                    # TODO 增加metric？
+                    pass
+            data[FIELD_TIMESTAMP] = moment(kwargs['ts']).format('X.SSS')
+            tdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_TDU, self.oid)
+            DBHandler.add(data, tdu_table_name)
         else:
             logger.warning([2001])
 
@@ -1028,7 +1045,7 @@ class TimeDataUnit(DataUnit):
         pass
 
     def sync_db(self, filename, init_flag=False):
-        table_name = DBHandler.get_table_name(self._service_id, TABLE_TYPE_TDU, self._owner_id)
+        table_name = DBHandler.get_table_name(self._service_id, TABLE_TYPE_TDU, self.oid)
         if init_flag:
             tdu_fields = self.fields()
             DBHandler.init_table(table_name, tdu_fields)

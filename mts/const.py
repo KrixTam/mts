@@ -189,16 +189,8 @@ PV_SDU_QUERY = ParameterValidator({
 })
 
 PV_TDU_ADD = ParameterValidator({
-    'records': {
-        'type': 'array',
-        'items': {
-            'type': 'object',
-            'properties': {
-                'ts': {'type': 'string'},
-                'data': {'type': 'object'}
-            }
-        }
-    }
+    'ts': {'type': 'string'},
+    'data': {'type': 'object'}
 })
 
 DEFAULT_TZ = '08:00:00'
