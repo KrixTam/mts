@@ -21,6 +21,11 @@ class TestSpaceDataUnit(unittest.TestCase):
         dd.sync_db(dd_file_name, True)
 
     def test_01(self):
+        # 创建tdu
+        service_id = '51'
+        sdu = SpaceDataUnit(service_id)
+        logger.log(sdu.tags)
+        logger.log(sdu._tag_definition)
         self.assertEqual(True, True)
 
 

@@ -29,11 +29,21 @@ class TestDataDictionary(unittest.TestCase):
         with self.assertRaises(ValueError):
             DataDictionary.query_oid('52', 'bad')
 
-    def test_add(self):
+    def test_add_01(self):
         service_id = '51'
         dd = DataDictionary(service_id)
-        dd.add(dd_type=DD_TYPE_OWNER, desc='苹果', oid_mask='')
+        ddid = dd.add(dd_type=DD_TYPE_OWNER, desc='苹果', oid_mask='')
         self.assertEqual(1, len(dd.query(True, desc=['苹果'])))
+        self.assertEqual(ddid[1:], dd.map_oid(desc='苹果'))
+        self.assertEqual('苹果', dd.map_desc(ddid[1:]))
+
+    def test_add_02(self):
+        service_id = '56'
+        dd = DataDictionary(service_id)
+        ddid = dd.add(dd_type=DD_TYPE_OWNER, desc='苹果', oid_mask='')
+        self.assertEqual(1, len(dd.query(True, desc=['苹果'])))
+        self.assertEqual(ddid[1:], dd.map_oid(desc='苹果'))
+        self.assertEqual('苹果', dd.map_desc(ddid[1:]))
 
     def test_append(self):
         service_id = '55'
