@@ -88,6 +88,11 @@ OID = {
     'pattern': '[a-f0-9]{16}'
 }
 
+DDID = {
+    'type': 'string',
+    'pattern': '[a-f0-9]{17}'
+}
+
 DESC = {
     'type': 'string',
     'maxLength': 160
@@ -100,10 +105,7 @@ DD_TYPE = {
 
 PV_ID = ParameterValidator({
     'oid': OID,
-    'ddid': {
-        'type': 'string',
-        'pattern': '[a-f0-9]{17}'
-    }
+    'ddid': DDID
 })
 
 SERVICE_CODE_MIN = int('101000', 2)
@@ -135,6 +137,12 @@ PV_DD_QUERY = ParameterValidator({
     'desc': {
         'type': 'array',
         'items': DESC,
+        'minItems': 1
+    },
+    'oid': OID,
+    'ddid': {
+        'type': 'array',
+        'items': DDID,
         'minItems': 1
     }
 })

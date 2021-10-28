@@ -920,6 +920,27 @@ class DataDictionary(DataUnit):
     def get_oid(self, dd_type: str):
         return self.query(True, dd_type=dd_type)
 
+    def map_oid(self, desc: str, dd_type: str = None):
+        if dd_type is None:
+            res = self.query(True, desc=[desc])
+        else:
+            res = self.query(True, dd_type=dd_type, desc=[desc])
+        if 1 == len(res):
+            return res[0]
+        else:
+            return None
+
+    def map_desc(self, oid: str, dd_type: str = None):
+        if dd_type is None:
+            res = self.query(oid=oid)['desc']
+        else:
+            ddid = dd_type + oid
+            res = self.query(ddid=ddid)['desc']
+        if 1 == len(res.index):
+            return res[0]
+        else:
+            return None
+
     @staticmethod
     def query_oid(service_id: str, dd_type: str):
         data = DataDictionary.query_dd(service_id, dd_type)
@@ -957,6 +978,16 @@ class DataDictionary(DataUnit):
                 res = res[res['desc'].isin(kwargs['desc'])]
             else:
                 raise ValueError(logger.error([5803]))
+        if 'ddid' in kwargs:
+            if PV_DD_QUERY.validate('ddid', kwargs['ddid']):
+                res = res[res[FIELD_DDID].isin(kwargs['ddid'])]
+            else:
+                raise ValueError(logger.error([5807]))
+        if 'oid' in kwargs:
+            if PV_DD_QUERY.validate('oid', kwargs[KEY_OID]):
+                res = res[res[FIELD_DDID].str[1:] == kwargs[KEY_OID]]
+            else:
+                raise ValueError(logger.error([5808]))
         if oid_only:
             res = res[FIELD_DDID].apply(lambda x: x[1:]).tolist()
             res.sort()
@@ -970,12 +1001,14 @@ class DataDictionary(DataUnit):
                 duplicated = False
             if duplicated:
                 logger.warning([5804, kwargs])
+                return res[KEY_DDID][0]
             else:
                 ddid = str(DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=self.service_id))
                 data = {'ddid': ddid, 'desc': kwargs['desc'], 'oid_mask': kwargs['oid_mask']}
                 dd_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_DD)
                 DBHandler.add(data, dd_table_name)
                 self.reload()
+                return ddid
         else:
             raise ValueError(logger.error([5805, kwargs]))
 
