@@ -26,6 +26,7 @@ class TestSpaceDataUnit(unittest.TestCase):
         sdu = SpaceDataUnit(service_id)
         logger.log(sdu.tags)
         logger.log(sdu._tag_definition)
+        logger.log(sdu._data)
         self.assertEqual(True, True)
 
 

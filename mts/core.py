@@ -1064,7 +1064,7 @@ class TimeDataUnit(DataUnit):
     def fields(self):
         fields = {FIELD_TIMESTAMP: 'VARCHAR(16) PRIMARY KEY'}  # String of Unix Millisecond Timestamp
         for metric in self._metric:
-            fields[metric] = 'VARCHAR(16)'
+            fields[metric] = 'INT'
         return fields
 
     def query(self, **kwargs):
@@ -1097,10 +1097,6 @@ class TimeDataUnit(DataUnit):
                 res[FIELD_TIMESTAMP] = TimeDataUnit.to_date(res[FIELD_TIMESTAMP])
                 res.index = res[FIELD_TIMESTAMP]
                 del res[FIELD_TIMESTAMP]
-                if fields is None:
-                    res[self._metric] = res[self._metric].apply(pd.to_numeric)
-                else:
-                    res[kwargs[KEY_METRIC]] = res[kwargs[KEY_METRIC]].apply(pd.to_numeric)
                 return res
         else:
             raise ValueError(logger.error([2000]))
@@ -1119,7 +1115,7 @@ class TimeDataUnit(DataUnit):
                 else:
                     ddid = DataDictionary.append(service_id=self.service_id, dd_type=DD_TYPE_METRIC, desc=key, oid_mask='')
                     metric_id = ddid[1:]
-                    DBHandler.add_column(tdu_table_name, metric_id, 'VARCHAR(16)')
+                    DBHandler.add_column(tdu_table_name, metric_id, 'INT')
                     self._desc[key] = metric_id
                     self._metric.append(metric_id)
                     data[metric_id] = value
