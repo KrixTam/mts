@@ -4,13 +4,15 @@ from mts.const import *
 from mts.core import DataUnitService, DBHandler
 from mts.utils import logger
 
+cwd = os.path.abspath(os.path.dirname(__file__))
+
 
 class TestDataUnitService(unittest.TestCase):
     def test_constructor_01(self):
         settings = {
             'service_id': '51',
-            'ds_path': os.path.join('resources', 'ds'),
-            'bak_path': os.path.join('output'),
+            'ds_path': os.path.join(cwd, 'resources', 'ds'),
+            'bak_path': os.path.join(cwd, 'output'),
             'owners': ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉'],
             'metrics': ['进货量/斤', '销量/斤'],
             'tags': [
@@ -34,7 +36,7 @@ class TestDataUnitService(unittest.TestCase):
                 },
             ]
         }
-        db_url = 'sqlite://' + os.path.join(os.getcwd(), 'output', 'mtsdb')
+        db_url = 'sqlite://' + os.path.join(cwd, 'output', 'mtsdb')
         logger.log(db_url)
         DBHandler.register(db_url)
         ds = DataUnitService(settings, True)
@@ -58,7 +60,7 @@ class TestDataUnitService(unittest.TestCase):
             'service_id': '51',
             'ds_path': os.path.join('resources', 'ds')
         }
-        db_url = 'sqlite://' + os.path.join(os.getcwd(), 'resources', 'ds', 'mtsdb')
+        db_url = 'sqlite://' + os.path.join(cwd, 'resources', 'ds', 'mtsdb')
         DBHandler.register(db_url)
         ds = DataUnitService(settings)
         owners = ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉']

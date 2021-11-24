@@ -33,6 +33,7 @@ def checksum(filename):
 # 5600-5699：DataDictionaryId
 # 5700-5799：DBHandler
 # 5800-5899：DataDictionary
+# 5900-5999：DataFileHandler
 
 
 ERROR_DEF = {
@@ -42,6 +43,8 @@ ERROR_DEF = {
     '2001': '[{0}] 调用TimeDataUnit的add方法，其参数不符合规范。',
     '2002': '[{0}] 构建TimeDataUnit失败，owner_id值异常。',
     '2003': '[{0}] TimeDataUnit对应的数据库表不存在，或者DB异常，导致query失败。',
+    '2500': '[{0}] 待导入文件{1}内容不符合SDU数据规则要求，请检查后重新执行导入操作',
+    '2501': '[{0}] 调用SpaceDataUnit的add方法，其参数不符合规范。',
     '4500': '[{0}] 构建DataUnit失败，service_id值异常。',
     '5000': '[{0}] 非法id；将自动生成一个新的 Object ID。',
     '5001': '[{0}] DataUnitService配置参数错误。',
@@ -74,6 +77,8 @@ ERROR_DEF = {
     '5806': '[{0}] append参数{1}异常。',
     '5807': '[{0}] query的参数ddid值异常。',
     '5808': '[{0}] query的参数oid值异常。',
+    '5900': '[{0}] 成功读取文件"{1}"。',
+    '5901': '[{0}] 找不到"{1}"。',
 }
 
 logger = Logger(ERROR_DEF, 'mts')

@@ -4,7 +4,8 @@ import pandas as pd
 from mts.core import DBHandler, DataDictionaryId
 from mts.const import *
 
-output_dir = os.path.join(os.getcwd(), 'output')
+cwd = os.path.abspath(os.path.dirname(__file__))
+output_dir = os.path.join(cwd, 'output')
 
 
 class TestDBHandler(unittest.TestCase):
@@ -12,7 +13,7 @@ class TestDBHandler(unittest.TestCase):
     def setUpClass(cls):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        db_file_name = os.path.join(os.getcwd(), 'output', 'dbhandler')
+        db_file_name = os.path.join(output_dir, 'dbhandler')
         db_url = 'sqlite://' + db_file_name
         if os.path.exists(db_file_name):
             os.remove(db_file_name)
@@ -32,7 +33,7 @@ class TestDBHandler(unittest.TestCase):
         self.assertEqual(fields, fields_dd)
         df = DBHandler.query(service_id, TABLE_TYPE_DD)
         self.assertTrue(df.empty)
-        dd_file_name = os.path.join(os.getcwd(), 'resources', 'ds', '51.dd')
+        dd_file_name = os.path.join(cwd, 'resources', 'ds', '51.dd')
         DBHandler.import_data(dd_file_name, dd_table_name)
         df = DBHandler.query(service_id, TABLE_TYPE_DD)
         self.assertFalse(df.empty)

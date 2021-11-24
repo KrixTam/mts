@@ -5,20 +5,25 @@ from mts.const import *
 from mts.core import TimeDataUnit, DBHandler, DataDictionary
 from mts.utils import logger
 
+cwd = os.path.abspath(os.path.dirname(__file__))
+
 
 class TestTimeDataUnit(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        output_dir = os.path.join(os.getcwd(), 'output')
+        output_dir = os.path.join(cwd, 'output')
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        db_file_name = os.path.join(os.getcwd(), 'output', 'tdu')
+        db_file_name = os.path.join(output_dir, 'tdu')
         db_url = 'sqlite://' + db_file_name
         if os.path.exists(db_file_name):
             os.remove(db_file_name)
         DBHandler.register(db_url)
         dd = DataDictionary('51')
-        dd_file_name = os.path.join(os.getcwd(), 'resources', 'ds', '51.dd')
+        print('===========')
+        print(cwd)
+        print(os.getcwd())
+        dd_file_name = os.path.join(cwd, 'resources', 'ds', '51.dd')
         dd.sync_db(dd_file_name, True)
 
     def test_01(self):
@@ -29,7 +34,7 @@ class TestTimeDataUnit(unittest.TestCase):
         df = tdu.query()
         self.assertTrue(df.empty)
         # sync_db测试
-        filename = os.path.join(os.getcwd(), 'resources', 'ds', '51_a4059507fd2fc000.tdu')
+        filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
         tdu.sync_db(filename, True)
         # 重复sync测试
         tdu.sync_db(filename)
@@ -41,6 +46,11 @@ class TestTimeDataUnit(unittest.TestCase):
         tdu = TimeDataUnit(service_id, 'a405ac45493b2000')
         # 常规无条件限制下的query测试
         df_01 = tdu.query()
+        if df_01.empty:
+            DBHandler.set_mode(DB_MODE_SD)
+            filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
+            tdu.sync_db(filename, True)
+            df_01 = tdu.query()
         a = TimeDataUnit.to_date('1617120000.000')
         self.assertEqual(df_01.loc[a]['a4059507fd30c003':][0], 80)
         # 只查询个别metric
@@ -59,6 +69,7 @@ class TestTimeDataUnit(unittest.TestCase):
 
     def test_03(self):
         # 创建tdu
+        DBHandler.set_mode(DB_MODE_SD)
         service_id = '51'
         tdu = TimeDataUnit(service_id, 'a405ac45493b2000')
         dd = DataDictionary(service_id)
@@ -66,6 +77,10 @@ class TestTimeDataUnit(unittest.TestCase):
         tdu.add(ts='2021-3-17', data={'进货量/斤': 123, '转售额/斤': 40})
         dd.reload()
         df_05 = tdu.query(interval={'from': '2021-02-15', 'to': '2021-04-15'})
+        if 1 == df_05.shape[0]:
+            filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
+            tdu.sync_db(filename)
+            df_05 = tdu.query(interval={'from': '2021-02-15', 'to': '2021-04-15'})
         self.assertEqual(3, len(df_05.index))
         df_06 = tdu.query(any=['2021-03-17'])
         # logger.log(df_06)

@@ -1,4 +1,5 @@
 import csv
+import yaml
 import sqlite3
 import threading
 import connectorx as cx
@@ -46,7 +47,7 @@ class ObjectId(object):
                     raise TypeError(logger.error([5501, type(oid)]))
 
     def __str__(self):
-        return hex_str(self._id, 16)
+        return hex_str(self._id, OID_LEN)
 
     def __repr__(self):
         service_code, ts, pid_code, sequence = ObjectId.unpack(self._id)
@@ -74,7 +75,7 @@ class ObjectId(object):
     @staticmethod
     def unpack(oid):
         oid_value = oid
-        if isinstance(oid, int):
+        if isinstance(oid_value, int):
             pass
         else:
             if isinstance(oid_value, str) and len(oid_value) == OID_LEN:
@@ -92,13 +93,17 @@ class ObjectId(object):
         return service_code, last_ts, pid_code, sequence
 
     @staticmethod
+    def timestamp(ts: int):
+        return EPOCH_MOMENT.add(ts, 'ms')
+
+    @staticmethod
     def pack(service_code: int, timestamp: moment = None, sn: int = None):
         ts = timestamp
         if timestamp is None:
             ts = moment()
-            if ts.unix() < ObjectId._epoch:
-                raise ValueError(logger.error([5502]))
-            ts = (ts.unix() - ObjectId._epoch) * 1000 + ts.milliseconds()
+        if ts.unix() < ObjectId._epoch:
+            raise ValueError(logger.error([5502]))
+        ts = (ts.unix() - ObjectId._epoch) * 1000 + ts.milliseconds()
         pid_code = ObjectId._generate_pid_code()
         sequence = sn
         if sn is None:
@@ -118,7 +123,8 @@ class ObjectId(object):
 
     def _generate(self, oid):
         service_code, last_ts, pid_code, sequence = ObjectId.unpack(oid)
-        self._id = ObjectId.pack(service_code, last_ts, sequence)
+        moment_last_ts = EPOCH_MOMENT.add(last_ts, 'ms')
+        self._id = ObjectId.pack(service_code, moment_last_ts, sequence)
 
     @staticmethod
     def validate(oid):
@@ -284,6 +290,20 @@ class DataDictionaryId(object):
         if isinstance(other, DataDictionaryId):
             return self._id >= other.value
         return NotImplemented
+
+
+class DataFileHandler(object):
+
+    @staticmethod
+    def load_json(filename):
+        obj_json = None
+        if path.exists(filename):
+            with open(filename, 'r') as f:
+                obj_json = yaml.safe_load(f)
+                logger.info([5900, filename])
+        else:
+            logger.warning([5901, filename])
+        return obj_json
 
 
 class DBHandler(object):
@@ -518,6 +538,9 @@ class DataUnitProcessor(object):
 
 
 class DataUnitService(object):
+    # TODO:
+    # 1. SDU、TDU增加字段的时候，如何通知DUS？
+    #
     __slots__ = ('_dd', '_config', '_sdu', '_tdu')
 
     def __init__(self, settings, init_flag=False):
@@ -888,7 +911,7 @@ class DataUnit(object):
         pass
 
     @abstractmethod
-    def import_data(self, filename):
+    def import_data(self, filename, data_dict=None):
         pass
 
     @abstractmethod
@@ -932,10 +955,10 @@ class DataDictionary(DataUnit):
 
     def map_desc(self, oid: str, dd_type: str = None):
         if dd_type is None:
-            res = self.query(oid=oid)['desc']
+            res = self.query(oid=oid)[FIELD_DESC]
         else:
             ddid = dd_type + oid
-            res = self.query(ddid=ddid)['desc']
+            res = self.query(ddid=ddid)[FIELD_DESC]
         if 1 == len(res.index):
             return res[0]
         else:
@@ -1004,7 +1027,7 @@ class DataDictionary(DataUnit):
                 return res[KEY_DDID][0]
             else:
                 ddid = str(DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=self.service_id))
-                data = {'ddid': ddid, 'desc': kwargs['desc'], 'oid_mask': kwargs['oid_mask']}
+                data = {FIELD_DDID: ddid, FIELD_DESC: kwargs['desc'], FIELD_OID_MASK: kwargs['oid_mask']}
                 dd_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_DD)
                 DBHandler.add(data, dd_table_name)
                 self.reload()
@@ -1017,7 +1040,7 @@ class DataDictionary(DataUnit):
         if PV_DD_APPEND.validates(kwargs):
             sid = kwargs[KEY_SERVICE_ID]
             ddid = str(DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=sid))
-            data = {'ddid': ddid, 'desc': kwargs['desc'], 'oid_mask': kwargs['oid_mask']}
+            data = {FIELD_DDID: ddid, FIELD_DESC: kwargs['desc'], FIELD_OID_MASK: kwargs['oid_mask']}
             dd_table_name = DBHandler.get_table_name(sid, TABLE_TYPE_DD)
             DBHandler.add(data, dd_table_name)
             return ddid
@@ -1028,7 +1051,7 @@ class DataDictionary(DataUnit):
         # TODO 待实现
         pass
 
-    def import_data(self, filename):
+    def import_data(self, filename, data_dict=None):
         # TODO 待实现
         pass
 
@@ -1053,7 +1076,7 @@ class TimeDataUnit(DataUnit):
             data = DataDictionary.query_dd(service_id, DD_TYPE_METRIC)
             for index, row in data.iterrows():
                 # logger.log(row)
-                self._desc[row['desc']] = row[KEY_DDID][1:]
+                self._desc[row[FIELD_DESC]] = row[KEY_DDID][1:]
         else:
             raise ValueError(logger.error([4500]))
 
@@ -1136,7 +1159,7 @@ class TimeDataUnit(DataUnit):
             DBHandler.init_table(table_name, tdu_fields)
         DBHandler.import_data(filename, table_name)
 
-    def import_data(self, filename):
+    def import_data(self, filename, data_dict=None):
         # TODO 待实现
         pass
 
@@ -1158,10 +1181,20 @@ class SpaceDataUnit(DataUnit):
             self._tags.append(tag_oid)
         for index, row in dd_tag_value.iterrows():
             tag_value_oid = row[KEY_DDID][1:]
-            tag_oid = row['oid_mask'][:16]
-            tag_value_mask = row['oid_mask'][16:]
-            self._tag_definition[tag_oid][tag_value_oid] = tag_value_mask
+            tag_oid = row[FIELD_OID_MASK][:16]
+            tag_value_mask = row[FIELD_OID_MASK][16:]
+            self._tag_definition[tag_oid][tag_value_oid] = int(tag_value_mask, 16)
         self._tags.sort()
+        self._desc = {}
+        data = DataDictionary.query_dd(service_id, DD_TYPE_OWNER)
+        for index, row in data.iterrows():
+            self._desc[row[FIELD_DESC]] = row[KEY_DDID][1:]
+        data = DataDictionary.query_dd(service_id, DD_TYPE_TAG)
+        for index, row in data.iterrows():
+            self._desc[row[FIELD_DESC]] = row[KEY_DDID][1:]
+        data = DataDictionary.query_dd(service_id, DD_TYPE_TAG_VALUE)
+        for index, row in data.iterrows():
+            self._desc[row[FIELD_DESC]] = row[KEY_DDID][1:]
         if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_SDU)):
             pass
         else:
@@ -1173,16 +1206,53 @@ class SpaceDataUnit(DataUnit):
         return self._tags
 
     def fields(self):
-        fields = {'owner': 'VARCHAR(16) PRIMARY KEY'}
-        for tag in self._tags:
-            fields[tag] = 'INT'
+        fields = {FIELD_OWNER: 'VARCHAR(16) PRIMARY KEY'}
+        for tag in self.tags:
+            fields[tag] = 'INT DEFAULT 0'
         return fields
 
     def query(self, **kwargs):
         pass
 
     def add(self, **kwargs):
-        pass
+        if PV_SDU_ADD.validates(kwargs):
+            data = {}
+            sdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_SDU)
+            for key, value in kwargs['data'].items():
+                tag_oid = None
+                if key in self._desc:
+                    tag_oid = self._desc[key]
+                else:
+                    ddid = DataDictionary.append(service_id=self.service_id, dd_type=DD_TYPE_TAG, desc=key, oid_mask='')
+                    tag_oid = ddid[1:]
+                    DBHandler.add_column(sdu_table_name, tag_oid, 'INT DEFAULT 0')
+                    self._desc[key] = tag_oid
+                    self._tags.append(tag_oid)
+                    self._tag_definition[tag_oid] = {}
+                tag_value_all = 0
+                for tag_value in value:
+                    tag_value_oid = None
+                    tag_value_mask = 0
+                    if tag_value in self._desc:
+                        tag_value_oid = self._desc[tag_value]
+                        tag_value_mask = self._tag_definition[tag_oid][tag_value_oid]
+                    else:
+                        tag_value_mask = len(self._tag_definition[tag_oid]) + 1
+                        oid_mask = tag_oid + hex_str(tag_value_mask, 16)
+                        ddid = DataDictionary.append(service_id=self.service_id, dd_type=DD_TYPE_TAG_VALUE, desc=tag_value, oid_mask=oid_mask)
+                        tag_value_oid = ddid[1:]
+                    tag_value_all = tag_value_all + tag_value_mask
+                data[tag_oid] = tag_value_all
+            owner = kwargs['owner']
+            if owner in self._desc:
+                data[FIELD_OWNER] = self._desc[owner]
+            else:
+                ddid = DataDictionary.append(service_id=self.service_id, dd_type=DD_TYPE_OWNER, desc=owner, oid_mask='')
+                owner_oid = ddid[1:]
+                data[FIELD_OWNER] = owner_oid
+            DBHandler.add(data, sdu_table_name)
+        else:
+            logger.error([2501])
 
     def remove(self, **kwargs):
         # TODO 待实现
@@ -1191,8 +1261,30 @@ class SpaceDataUnit(DataUnit):
     def sync_db(self, filename, init_flag=False):
         pass
 
-    def import_data(self, filename):
+    def import_data(self, filename, data_dict=None):
         # TODO 待实现
+        '''
+        data = DataFileHandler.load_json(filename)
+        dd = data_dict
+        if dd is None:
+            dd = DataDictionary(self.service_id)
+        if PV_SDU_DATA.validate('tag', data):
+            records = {}
+            for tag in data:
+                tag_oid = dd.map_oid(desc=tag['name'])
+                for value in tag['values']:
+                    tag_value_oid = dd.map_oid(desc=value['desc'])
+                    for owner_desc in value['owners']:
+                        owner_oid = dd.map_oid(desc=owner_desc)
+                        if owner_oid in records:
+                            records[owner_oid][tag_oid] = records[owner_oid][tag_value_oid] + self._tag_definition[tag_oid][tag_value_oid]
+                        else:
+                            records[owner_oid] = {tag_oid: self._tag_definition[tag_oid][tag_value_oid]}
+            for owner_oid, tags in records.items():
+
+        else:
+            raise ValueError(logger.error([2500, filename]))
+        '''
         pass
 
     def export_data(self, output_dir):

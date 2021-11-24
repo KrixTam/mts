@@ -11,6 +11,10 @@ class TestObjectId(unittest.TestCase):
         c = ObjectId(str(a))
         self.assertTrue(a == b)
         self.assertTrue(a == c)
+        service_code, last_ts, pid_code, sequence = ObjectId.unpack('a4059507fd30c005')
+        ts = ObjectId.timestamp(last_ts)
+        d = ObjectId.pack(service_code, ts, sequence + 1)
+        self.assertEqual(pid_code, ObjectId.unpack(d)[2])
 
     def test_comp(self):
         a = ObjectId()

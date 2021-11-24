@@ -1,10 +1,12 @@
 from pandas import DataFrame
 from datetime import timedelta
-from ni.config import ParameterValidator
+from ni.config import ParameterValidator, Config
 from mts.utils import hex_str
+from moment import moment
 
 
 EPOCH_DEFAULT = 1608480000
+EPOCH_MOMENT = moment('2020-12-21')
 DB_MODE_CX = 0  # connectX
 DB_MODE_SD = 1  # sqlite
 
@@ -34,10 +36,17 @@ DD_TYPE_OWNER = hex_str(1, 1)
 DD_TYPE_METRIC = hex_str(2, 1)
 DD_TYPE_TAG = hex_str(3, 1)
 DD_TYPE_TAG_VALUE = hex_str(4, 1)
+DD_TYPE_SUB_METRIC = hex_str(5, 1)
 
-DD_TYPES = [DD_TYPE_OWNER, DD_TYPE_METRIC, DD_TYPE_TAG, DD_TYPE_TAG_VALUE]
+DD_TYPES = [DD_TYPE_OWNER, DD_TYPE_METRIC, DD_TYPE_TAG, DD_TYPE_TAG_VALUE, DD_TYPE_SUB_METRIC]
 
-DD_HEADERS = 'ddid,desc,oid_mask'
+FIELD_DDID = 'ddid'
+FIELD_DESC = 'desc'
+FIELD_OID_MASK = 'oid_mask'
+FIELD_TIMESTAMP = 'timestamp'
+FIELD_OWNER = 'owner'
+
+DD_HEADERS = FIELD_DDID + ',' + FIELD_DESC + ',' + FIELD_OID_MASK
 
 FILE_TYPE_DD = 'dd'
 FILE_TYPE_SDU = 'sdu'
@@ -63,7 +72,7 @@ FILE_EXT_BY_TABLE_TYPE = {
     TABLE_TYPE_TDU: '.tdu'
 }
 
-FIELDS_DD = {'ddid': 'VARCHAR(17) PRIMARY KEY', 'desc': 'VARCHAR(160)', 'oid_mask': 'VARCHAR(32)'}
+FIELDS_DD = {FIELD_DDID: 'VARCHAR(17) PRIMARY KEY', FIELD_DESC: 'VARCHAR(160)', FIELD_OID_MASK: 'VARCHAR(32)'}
 
 CACHE_TTL_DEFAULT = timedelta(hours=12)
 CACHE_MAX_SIZE_DEFAULT = 30
@@ -76,9 +85,6 @@ KEY_SERVICE_ID = 'service_id'
 KEY_SERVICE_CODE = 'service_code'
 KEY_DD_TYPE = 'dd_type'
 KEY_METRIC = 'metric'
-
-FIELD_DDID = 'ddid'
-FIELD_TIMESTAMP = 'timestamp'
 
 OID_LEN = 16
 DDID_LEN = 17
@@ -216,7 +222,30 @@ PV_SDU_QUERY = ParameterValidator({
 
 PV_TDU_ADD = ParameterValidator({
     'ts': {'type': 'string'},
-    'data': {'type': 'object'}
+    'data': {
+        'type': 'object',
+        'propertyNames': {'type': 'string'},
+        'patternProperties': {
+            '': {'type': 'number'}
+        }
+    }
+})
+
+PV_SDU_ADD = ParameterValidator({
+    'owner': {'type': 'string'},
+    'data': {
+        'type': 'object',
+        'propertyNames': {'type': 'string'},
+        'patternProperties': {
+            '': {
+                'type': 'array',
+                'items': {
+                    'type': 'string',
+                    'minItems': 1
+                }
+            }
+        }
+    }
 })
 
 DEFAULT_TZ = '08:00:00'
@@ -229,3 +258,30 @@ PV_TZ = ParameterValidator({
 })
 
 EMPTY = DataFrame.empty
+
+PV_SDU_DATA = ParameterValidator({
+    'tag': {
+        'type': 'array',
+        'items': {
+            'type': 'object',
+            'properties': {
+                'name': {'type': 'string'},
+                'values': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'desc': {'type': 'string'},
+                            'owners': {
+                                'type': 'array',
+                                'items': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'minItems': 1
+                }
+            }
+        },
+        'minItems': 1
+    }
+})
