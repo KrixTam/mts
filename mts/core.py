@@ -94,7 +94,7 @@ class ObjectId(object):
 
     @staticmethod
     def timestamp(ts: int):
-        return EPOCH_MOMENT.add(ts, 'ms')
+        return EPOCH_MOMENT.add(ts + ObjectId._epoch - EPOCH_DEFAULT, 'ms')
 
     @staticmethod
     def pack(service_code: int, timestamp: moment = None, sn: int = None):
@@ -123,7 +123,7 @@ class ObjectId(object):
 
     def _generate(self, oid):
         service_code, last_ts, pid_code, sequence = ObjectId.unpack(oid)
-        moment_last_ts = EPOCH_MOMENT.add(last_ts, 'ms')
+        moment_last_ts = ObjectId.timestamp(last_ts)
         self._id = ObjectId.pack(service_code, moment_last_ts, sequence)
 
     @staticmethod
