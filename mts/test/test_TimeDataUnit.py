@@ -49,7 +49,7 @@ class TestTimeDataUnit(unittest.TestCase):
         if df_01.empty:
             DBHandler.set_mode(DB_MODE_SD)
             filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
-            tdu.sync_db(filename, True)
+            tdu.sync_db(filename)
             df_01 = tdu.query()
         a = TimeDataUnit.to_date('1617120000.000')
         self.assertEqual(df_01.loc[a]['a4059507fd30c003':][0], 80)

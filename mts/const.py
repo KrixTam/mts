@@ -192,6 +192,12 @@ PV_TDU_QUERY = ParameterValidator({
 })
 
 PV_SDU_QUERY = ParameterValidator({
+    'owner': {
+        'type': 'object',
+        'properties': {
+            'filter': {}
+        }
+    },
     'include': {
         'type': 'object',
         'properties': {

@@ -99,24 +99,25 @@ class ObjectId(object):
     @staticmethod
     def pack(service_code: int, timestamp: moment = None, sn: int = None):
         ts = timestamp
-        if timestamp is None:
+        if ts is None:
             ts = moment()
         if ts.unix() < ObjectId._epoch:
             raise ValueError(logger.error([5502]))
         ts = (ts.unix() - ObjectId._epoch) * 1000 + ts.milliseconds()
         pid_code = ObjectId._generate_pid_code()
         sequence = sn
-        if sn is None:
-            sequence = 0
-            with ObjectId._lock:
+        with ObjectId._lock:
+            if sn is None:
                 if ts == ObjectId._last_ts:
                     ObjectId._sequence = (ObjectId._sequence + 1) & SEQUENCE_MASK
-                    sequence = ObjectId._sequence
                     if ObjectId._sequence == 0:
                         ts = ts + 1
                 else:
                     ObjectId._sequence = 0
-                ObjectId._last_ts = ts
+                sequence = ObjectId._sequence
+            else:
+                ObjectId._sequence = sn
+            ObjectId._last_ts = ts
         new_id = (service_code << SERVICE_CODE_BITS_SHIFT) | (ts << TIMESTAMP_BITS_SHIFT) | (
                     pid_code << PID_CODE_BITS_SHIFT) | sequence
         return new_id

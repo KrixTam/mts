@@ -11,17 +11,18 @@ class TestObjectId(unittest.TestCase):
         c = ObjectId(str(a))
         self.assertTrue(a == b)
         self.assertTrue(a == c)
-        service_code, last_ts, pid_code, sequence = ObjectId.unpack('a4059507fd30c005')
+        service_code, last_ts, pid_code, sequence = ObjectId.unpack('a4059507fd30cfff')
         ts = ObjectId.timestamp(last_ts)
-        d = ObjectId.pack(service_code, ts, sequence + 1)
-        self.assertEqual(pid_code, ObjectId.unpack(d)[2])
+        d = ObjectId('a4059507fd30cfff')
+        e = ObjectId.pack(service_code, ts)
+        self.assertEqual(pid_code, ObjectId.unpack(str(d))[2])
 
     def test_comp(self):
         a = ObjectId()
         b = ObjectId()
         self.assertTrue(a < b)
 
-    def test_register(self):
+    def test_register_01(self):
         a = ObjectId()
         ObjectId.register({'service_code': 41})
         c = ObjectId()
@@ -34,6 +35,15 @@ class TestObjectId(unittest.TestCase):
         logger.log(c.__repr__())
         logger.log(d.__repr__())
         self.assertTrue(a == b)
+
+    def test_register_02(self):
+        ObjectId.register({'epoch': 0})
+        service_code, last_ts, pid_code, sequence = ObjectId.unpack('a4059507fd30cfff')
+        ts_01 = ObjectId.timestamp(last_ts)
+        ObjectId.register({'epoch': EPOCH_DEFAULT})
+        service_code, last_ts, pid_code, sequence = ObjectId.unpack('a4059507fd30cfff')
+        ts_02 = ObjectId.timestamp(last_ts)
+        self.assertEqual((ts_02.unix() - ts_01.unix()) * 1000, EPOCH_DEFAULT)
 
     def test_error_service_code(self):
         with self.assertRaises(ValueError):
