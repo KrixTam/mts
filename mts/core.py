@@ -227,7 +227,10 @@ class DataDictionaryId(object):
             if isinstance(ddid, str) and len(ddid) == DDID_LEN:
                 ddid_value = int(ddid, 16)
             else:
-                raise TypeError(logger.error([5602]))
+                if isinstance(ddid, DataDictionaryId):
+                    ddid_value = ddid.value
+                else:
+                    raise TypeError(logger.error([5602]))
         dd_type = ddid_value >> DD_TYPE_BITS_SHIFT
         oid = ddid_value & OID_MASK
         if DataDictionaryId._validate(dd_type, oid):

@@ -81,53 +81,63 @@ class TestObjectId(unittest.TestCase):
         self.assertFalse(ObjectId.validate('900616afc99d6000'))
         self.assertTrue(ObjectId.validate('a00616afc99d6000'))
 
-    def test_not_implement_01(self):
-        oid = ObjectId()
-        with self.assertRaises(TypeError):
-            oid > 2
-
-    def test_not_implement_02(self):
+    def test_eq(self):
         oid = ObjectId()
         self.assertFalse(oid == 2)
 
-    def test_not_implement_03(self):
-        oid = ObjectId()
-        with self.assertRaises(TypeError):
-            oid < 2
-
-    def test_not_implement_04(self):
-        oid = ObjectId()
-        with self.assertRaises(TypeError):
-            oid >= 2
-
-    def test_not_implement_05(self):
-        oid = ObjectId()
-        with self.assertRaises(TypeError):
-            oid <= 2
-
-    def test_not_implement_06(self):
+    def test_ne_01(self):
         oid = ObjectId()
         self.assertTrue(oid != 2)
 
-    def test_ne(self):
+    def test_ne_02(self):
         a = ObjectId()
         b = ObjectId()
         self.assertTrue(a != b)
 
-    def test_le(self):
+    def test_lt_01(self):
+        oid = ObjectId()
+        with self.assertRaises(TypeError):
+            oid < 2
+
+    def test_le_01(self):
         a = ObjectId()
         b = ObjectId()
-        self.assertTrue(a < b)
+        self.assertTrue(a <= b)
 
-    def test_gt(self):
+    def test_le_02(self):
+        a = ObjectId()
+        b = ObjectId(a)
+        self.assertTrue(a <= b)
+
+    def test_le_03(self):
+        oid = ObjectId()
+        with self.assertRaises(TypeError):
+            oid <= 2
+
+    def test_gt_01(self):
         a = ObjectId()
         b = ObjectId()
         self.assertTrue(b > a)
 
-    def test_ge(self):
+    def test_gt_02(self):
+        oid = ObjectId()
+        with self.assertRaises(TypeError):
+            oid > 2
+
+    def test_ge_01(self):
         a = ObjectId()
         b = ObjectId()
         self.assertTrue(b >= a)
+
+    def test_ge_02(self):
+        a = ObjectId()
+        b = ObjectId(a)
+        self.assertTrue(b >= a)
+
+    def test_ge_03(self):
+        oid = ObjectId()
+        with self.assertRaises(TypeError):
+            oid >= 2
 
 
 if __name__ == '__main__':
