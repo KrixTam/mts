@@ -68,9 +68,66 @@ class TestObjectId(unittest.TestCase):
         with self.assertRaises(ValueError):
             ObjectId.unpack(int('900616afc99d6000', 16))
 
+    def test_error_unpack_et(self):
+        with self.assertRaises(TypeError):
+            ObjectId.unpack([])
+
+    def test_error_pack_ts(self):
+        with self.assertRaises(ValueError):
+            ts = moment('2019-11-21')
+            ObjectId.pack(41, ts)
+
     def test_validate(self):
         self.assertFalse(ObjectId.validate('900616afc99d6000'))
         self.assertTrue(ObjectId.validate('a00616afc99d6000'))
+
+    def test_not_implement_01(self):
+        oid = ObjectId()
+        with self.assertRaises(TypeError):
+            oid > 2
+
+    def test_not_implement_02(self):
+        oid = ObjectId()
+        self.assertFalse(oid == 2)
+
+    def test_not_implement_03(self):
+        oid = ObjectId()
+        with self.assertRaises(TypeError):
+            oid < 2
+
+    def test_not_implement_04(self):
+        oid = ObjectId()
+        with self.assertRaises(TypeError):
+            oid >= 2
+
+    def test_not_implement_05(self):
+        oid = ObjectId()
+        with self.assertRaises(TypeError):
+            oid <= 2
+
+    def test_not_implement_06(self):
+        oid = ObjectId()
+        self.assertTrue(oid != 2)
+
+    def test_ne(self):
+        a = ObjectId()
+        b = ObjectId()
+        self.assertTrue(a != b)
+
+    def test_le(self):
+        a = ObjectId()
+        b = ObjectId()
+        self.assertTrue(a < b)
+
+    def test_gt(self):
+        a = ObjectId()
+        b = ObjectId()
+        self.assertTrue(b > a)
+
+    def test_ge(self):
+        a = ObjectId()
+        b = ObjectId()
+        self.assertTrue(b >= a)
 
 
 if __name__ == '__main__':

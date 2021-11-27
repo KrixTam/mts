@@ -260,36 +260,36 @@ class DataDictionaryId(object):
 
     @property
     def oid(self):
-        return hex_str(self._id, -16)
+        return hex_str(self.value, -16)
 
     def __eq__(self, other):
         if isinstance(other, DataDictionaryId):
-            return self._id == other.value
+            return self.value == other.value
         return NotImplemented
 
     def __ne__(self, other):
         if isinstance(other, DataDictionaryId):
-            return self._id != other.value
+            return self.value != other.value
         return NotImplemented
 
     def __lt__(self, other):
         if isinstance(other, DataDictionaryId):
-            return self._id < other.value
+            return self.value < other.value
         return NotImplemented
 
     def __le__(self, other):
         if isinstance(other, DataDictionaryId):
-            return self._id <= other.value
+            return self.value <= other.value
         return NotImplemented
 
     def __gt__(self, other):
         if isinstance(other, DataDictionaryId):
-            return self._id > other.value
+            return self.value > other.value
         return NotImplemented
 
     def __ge__(self, other):
         if isinstance(other, DataDictionaryId):
-            return self._id >= other.value
+            return self.value >= other.value
         return NotImplemented
 
 
