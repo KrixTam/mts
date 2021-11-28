@@ -3,15 +3,15 @@ import unittest
 
 from mts.const import *
 from mts.core import TimeDataUnit, DBHandler, DataDictionary
-from mts.utils import logger
+from mts.utils import checksum
 
 cwd = os.path.abspath(os.path.dirname(__file__))
+output_dir = os.path.join(cwd, 'output')
 
 
 class TestTimeDataUnit(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        output_dir = os.path.join(cwd, 'output')
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         db_file_name = os.path.join(output_dir, 'tdu')
@@ -20,9 +20,6 @@ class TestTimeDataUnit(unittest.TestCase):
             os.remove(db_file_name)
         DBHandler.register(db_url)
         dd = DataDictionary('51')
-        print('===========')
-        print(cwd)
-        print(os.getcwd())
         dd_file_name = os.path.join(cwd, 'resources', 'ds', '51.dd')
         dd.sync_db(dd_file_name, True)
 
@@ -39,6 +36,10 @@ class TestTimeDataUnit(unittest.TestCase):
         # 重复sync测试
         tdu.sync_db(filename)
         self.assertTrue(True)
+        tdu.export_data(output_dir)
+        file_01 = os.path.join(cwd, 'resources', 'ds', '51_a405ac45493b2000.tdu')
+        file_02 = os.path.join(output_dir, '51_a405ac45493b2000.tdu')
+        self.assertEqual(checksum(file_01), checksum(file_02))
 
     def test_02(self):
         # 创建tdu

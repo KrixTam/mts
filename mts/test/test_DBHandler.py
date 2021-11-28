@@ -6,6 +6,8 @@ from mts.const import *
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 output_dir = os.path.join(cwd, 'output')
+db_file_name = os.path.join(output_dir, 'dbhandler')
+db_url = 'sqlite://' + db_file_name
 
 
 class TestDBHandler(unittest.TestCase):
@@ -13,11 +15,13 @@ class TestDBHandler(unittest.TestCase):
     def setUpClass(cls):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        db_file_name = os.path.join(output_dir, 'dbhandler')
-        db_url = 'sqlite://' + db_file_name
         if os.path.exists(db_file_name):
             os.remove(db_file_name)
         DBHandler.register(db_url)
+
+    def test_constructor(self):
+        DBHandler(DB_MODE_SD)
+        self.assertEqual(DB_MODE_SD, DBHandler._mode)
 
     def test_all_cx(self):
         service_id = '51'
@@ -100,6 +104,51 @@ class TestDBHandler(unittest.TestCase):
         self.assertFalse('abc' in DBHandler.get_fields(dd_table_name))
         DBHandler.add_column(dd_table_name, 'abc', 'REAL')
         self.assertTrue('abc' in DBHandler.get_fields(dd_table_name))
+
+    def test_fail_set_tz(self):
+        self.assertFalse(DBHandler.set_tz(8))
+
+    def test_disconnect(self):
+        DBHandler.connect()
+        DBHandler.disconnect()
+        self.assertTrue(True)
+
+    def test_error_init_table_01(self):
+        with self.assertRaises(ValueError):
+            DBHandler.register(None)
+            dd_table_name = DBHandler.get_table_name('52', TABLE_TYPE_DD)
+            DBHandler.init_table(dd_table_name, FIELDS_DD)
+        DBHandler.register(db_url)
+
+    def test_error_init_table_02(self):
+        with self.assertRaises(ValueError):
+            dd_table_name = DBHandler.get_table_name('57', TABLE_TYPE_DD)
+            DBHandler.init_table(dd_table_name, {'a123': 123})
+
+    def test_error_export_data_01(self):
+        with self.assertRaises(ValueError):
+            service_id = '51'
+            DBHandler.export_data(output_dir, service_id, TABLE_TYPE_TDU)
+
+    def test_error_export_data_02(self):
+        with self.assertRaises(ValueError):
+            service_id = '51'
+            DBHandler.export_data(output_dir, service_id, 'new_type')
+
+    def test_error_get_table_name_01(self):
+        with self.assertRaises(ValueError):
+            service_id = '51'
+            DBHandler.get_table_name(service_id, 'new_type')
+
+    def test_error_get_table_name_02(self):
+        with self.assertRaises(ValueError):
+            service_id = '51'
+            DBHandler.get_table_name(service_id, TABLE_TYPE_TDU)
+
+    def test_error_get_table_name_03(self):
+        with self.assertRaises(ValueError):
+            service_id = '51'
+            DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, 'adfafdafdafda')
 
 
 if __name__ == '__main__':

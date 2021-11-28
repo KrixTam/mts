@@ -134,6 +134,13 @@ PV_SERVICE = ParameterValidator({
 PV_DB_DEFINITION = ParameterValidator({
     'field': {
         'type': 'object',
+        'propertyNames': {
+            'type': 'string',
+            'pattern': '^[a-zA-Z]'
+        },
+        'patternProperties': {
+            '': {'type': 'string'}
+        },
         'minProperties': 1
     }
 })

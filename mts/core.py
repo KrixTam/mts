@@ -313,10 +313,10 @@ class DataFileHandler(object):
 class DBHandler(object):
     _db_url = None  # sqlite:///path/to/db
     _connection = None
-    _mode = DB_MODE_CX
+    _mode = DB_MODE_SD
     _tz = pd.Timedelta(DEFAULT_TZ)
 
-    def __init__(self, mode=0, tz=DEFAULT_TZ):
+    def __init__(self, mode=DB_MODE_SD, tz=DEFAULT_TZ):
         DBHandler.set_mode(mode)
         DBHandler.set_tz(tz)
 
@@ -469,7 +469,7 @@ class DBHandler(object):
         else:
             if table_type == TABLE_TYPE_TDU:
                 if owner_id is None:
-                    raise
+                    raise ValueError(logger.error([5707]))
                 else:
                     output_filename = service_id + '_' + owner_id + FILE_EXT_BY_TABLE_TYPE[table_type]
             else:
