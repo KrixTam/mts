@@ -81,6 +81,7 @@ MOMENT_FORMAT = 'X.SSS'
 
 KEY_OID = 'oid'
 KEY_DDID = 'ddid'
+KEY_DESC = 'desc'
 KEY_SERVICE_ID = 'service_id'
 KEY_SERVICE_CODE = 'service_code'
 KEY_DD_TYPE = 'dd_type'
@@ -91,12 +92,12 @@ DDID_LEN = 17
 
 OID = {
     'type': 'string',
-    'pattern': '[a-f0-9]{16}'
+    'pattern': '^[a-f0-9]{16}'
 }
 
 DDID = {
     'type': 'string',
-    'pattern': '[a-f0-9]{17}'
+    'pattern': '^[a-f0-9]{17}'
 }
 
 DESC = {
@@ -106,7 +107,7 @@ DESC = {
 
 DD_TYPE = {
     'type': 'string',
-    'pattern': '[0-9a-f]{1}'
+    'pattern': '^[0-9a-f]{1}'
 }
 
 PV_ID = ParameterValidator({

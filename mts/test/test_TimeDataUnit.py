@@ -90,6 +90,10 @@ class TestTimeDataUnit(unittest.TestCase):
         new_metric = dd.query(True, desc=['转售额/斤'])[0]
         self.assertEqual(40, df_06[new_metric][0])
 
+    def test_04(self):
+        with self.assertRaises(ValueError):
+            TimeDataUnit('service_id', 'a405ac45493b2000')
+
 
 if __name__ == '__main__':
     unittest.main()

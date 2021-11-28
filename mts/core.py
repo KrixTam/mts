@@ -962,7 +962,7 @@ class DataDictionary(DataUnit):
             res = self.query(oid=oid)[FIELD_DESC]
         else:
             ddid = dd_type + oid
-            res = self.query(ddid=ddid)[FIELD_DESC]
+            res = self.query(ddid=[ddid])[FIELD_DESC]
         if 1 == len(res.index):
             return res[0]
         else:
@@ -1000,18 +1000,18 @@ class DataDictionary(DataUnit):
                     raise ValueError(logger.error([5801, kwargs[KEY_DD_TYPE]]))
             else:
                 raise ValueError(logger.error([5800, kwargs[KEY_DD_TYPE]]))
-        if 'desc' in kwargs:
-            if PV_DD_QUERY.validate('desc', kwargs['desc']):
-                res = res[res['desc'].isin(kwargs['desc'])]
+        if KEY_DESC in kwargs:
+            if PV_DD_QUERY.validate(KEY_DESC, kwargs[KEY_DESC]):
+                res = res[res['desc'].isin(kwargs[KEY_DESC])]
             else:
                 raise ValueError(logger.error([5803]))
-        if 'ddid' in kwargs:
-            if PV_DD_QUERY.validate('ddid', kwargs['ddid']):
-                res = res[res[FIELD_DDID].isin(kwargs['ddid'])]
+        if KEY_DDID in kwargs:
+            if PV_DD_QUERY.validate(KEY_DDID, kwargs[KEY_DDID]):
+                res = res[res[FIELD_DDID].isin(kwargs[KEY_DDID])]
             else:
                 raise ValueError(logger.error([5807]))
-        if 'oid' in kwargs:
-            if PV_DD_QUERY.validate('oid', kwargs[KEY_OID]):
+        if KEY_OID in kwargs:
+            if PV_DD_QUERY.validate(KEY_OID, kwargs[KEY_OID]):
                 res = res[res[FIELD_DDID].str[1:] == kwargs[KEY_OID]]
             else:
                 raise ValueError(logger.error([5808]))
@@ -1021,7 +1021,7 @@ class DataDictionary(DataUnit):
         return res
 
     def add(self, **kwargs):
-        if PV_DD_ADD.validates(kwargs):
+        if len(kwargs) > 0 and PV_DD_ADD.validates(kwargs):
             duplicated = True
             res = self.query(dd_type=kwargs[KEY_DD_TYPE], desc=[kwargs['desc']])
             if res.empty:
@@ -1041,7 +1041,7 @@ class DataDictionary(DataUnit):
 
     @staticmethod
     def append(**kwargs):
-        if PV_DD_APPEND.validates(kwargs):
+        if len(kwargs) > 0 and PV_DD_APPEND.validates(kwargs):
             sid = kwargs[KEY_SERVICE_ID]
             ddid = str(DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=sid))
             data = {FIELD_DDID: ddid, FIELD_DESC: kwargs['desc'], FIELD_OID_MASK: kwargs['oid_mask']}
