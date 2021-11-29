@@ -1,6 +1,5 @@
 import os
 import unittest
-
 from mts.const import *
 from mts.core import TimeDataUnit, DBHandler, DataDictionary
 from mts.utils import checksum
@@ -40,6 +39,10 @@ class TestTimeDataUnit(unittest.TestCase):
         file_01 = os.path.join(cwd, 'resources', 'ds', '51_a405ac45493b2000.tdu')
         file_02 = os.path.join(output_dir, '51_a405ac45493b2000.tdu')
         self.assertEqual(checksum(file_01), checksum(file_02))
+        res = tdu.query(metric=['a405ac45493b2000'])
+        self.assertTrue(res.empty)
+        with self.assertRaises(ValueError):
+            tdu.query(err_pa='12312')
 
     def test_02(self):
         # 创建tdu
@@ -93,6 +96,15 @@ class TestTimeDataUnit(unittest.TestCase):
     def test_04(self):
         with self.assertRaises(ValueError):
             TimeDataUnit('service_id', 'a405ac45493b2000')
+
+    def test_05(self):
+        with self.assertRaises(ValueError):
+            TimeDataUnit('51', 'a405ac45493b200')
+
+    def test_06(self):
+        with self.assertRaises(ValueError):
+            tdu = TimeDataUnit('51', 'a405ac45493b2000')
+            tdu.add()
 
 
 if __name__ == '__main__':

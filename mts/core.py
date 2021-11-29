@@ -1082,7 +1082,7 @@ class TimeDataUnit(DataUnit):
                 # logger.log(row)
                 self._desc[row[FIELD_DESC]] = row[KEY_DDID][1:]
         else:
-            raise ValueError(logger.error([4500]))
+            raise ValueError(logger.error([2002]))
 
     @property
     def oid(self):
@@ -1133,7 +1133,7 @@ class TimeDataUnit(DataUnit):
         return pd.to_datetime(data, unit='s') + DBHandler.tz()
 
     def add(self, **kwargs):
-        if PV_TDU_ADD.validates(kwargs):
+        if len(kwargs) > 0 and PV_TDU_ADD.validates(kwargs):
             data = {}
             tdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_TDU, self.oid)
             for key, value in kwargs['data'].items():
@@ -1150,7 +1150,7 @@ class TimeDataUnit(DataUnit):
             tdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_TDU, self.oid)
             DBHandler.add(data, tdu_table_name)
         else:
-            logger.warning([2001])
+            raise ValueError(logger.warning([2001]))
 
     def remove(self, **kwargs):
         # TODO 待实现
