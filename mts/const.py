@@ -1,14 +1,12 @@
 from pandas import DataFrame
 from datetime import timedelta
-from ni.config import ParameterValidator, Config
+from ni.config import ParameterValidator
 from mts.utils import hex_str
 from moment import moment
 
 
 EPOCH_DEFAULT = 1608480000
 EPOCH_MOMENT = moment('2020-12-21')
-DB_MODE_CX = 0  # connectX
-DB_MODE_SD = 1  # sqlite
 
 SERVICE_CODE_BITS = 6
 TIMESTAMP_BITS = 42

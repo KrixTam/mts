@@ -17,7 +17,7 @@ class TestTimeDataUnit(unittest.TestCase):
         db_url = 'sqlite://' + db_file_name
         if os.path.exists(db_file_name):
             os.remove(db_file_name)
-        DBHandler.register(db_url)
+        DBHandler(db_url)
         dd = DataDictionary('51')
         dd_file_name = os.path.join(cwd, 'resources', 'ds', '51.dd')
         dd.sync_db(dd_file_name, True)
@@ -73,7 +73,6 @@ class TestTimeDataUnit(unittest.TestCase):
 
     def test_03(self):
         # 创建tdu
-        DBHandler.set_mode(DB_MODE_SD)
         service_id = '51'
         tdu = TimeDataUnit(service_id, 'a405ac45493b2000')
         dd = DataDictionary(service_id)

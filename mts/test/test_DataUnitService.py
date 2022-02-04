@@ -38,7 +38,7 @@ class TestDataUnitService(unittest.TestCase):
         }
         db_url = 'sqlite://' + os.path.join(cwd, 'output', 'mtsdb')
         logger.log(db_url)
-        DBHandler.register(db_url)
+        db = DBHandler(db_url)
         ds = DataUnitService(settings, True)
         tags = []
         owners = settings['owners']
@@ -51,7 +51,7 @@ class TestDataUnitService(unittest.TestCase):
             tags.append(tag['name'])
         tags.sort()
         self.assertEqual(ds.desc(dd_type=DD_TYPE_TAG), tags)
-        owner_ids = DBHandler.query(ds.service_id, TABLE_TYPE_SDU, ['owner'])['owner'].tolist()
+        owner_ids = db.query(ds.service_id, TABLE_TYPE_SDU, ['owner'])['owner'].tolist()
         owner_ids.sort()
         self.assertEqual(ds.owners, owner_ids)
 
@@ -61,7 +61,7 @@ class TestDataUnitService(unittest.TestCase):
             'ds_path': os.path.join('resources', 'ds')
         }
         db_url = 'sqlite://' + os.path.join(cwd, 'resources', 'ds', 'mtsdb')
-        DBHandler.register(db_url)
+        db = DBHandler(db_url)
         ds = DataUnitService(settings)
         owners = ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉']
         owners.sort()
@@ -72,7 +72,7 @@ class TestDataUnitService(unittest.TestCase):
         tags = ['颜色', '货源']
         tags.sort()
         self.assertEqual(ds.desc(dd_type=DD_TYPE_TAG), tags)
-        owner_ids = DBHandler.query(ds.service_id, TABLE_TYPE_SDU, ['owner'])['owner'].tolist()
+        owner_ids = db.query(ds.service_id, TABLE_TYPE_SDU, ['owner'])['owner'].tolist()
         owner_ids.sort()
         self.assertEqual(ds.owners, owner_ids)
 

@@ -9,11 +9,12 @@ from abc import abstractmethod
 from random import getrandbits
 from cachetools import TTLCache
 from datetime import datetime
-from moment import moment
+# from moment import moment
 from ni.config import Config
 from mts.const import *
 from mts.utils import logger
 from pandas.io.sql import DatabaseError
+from .singleton import Singleton
 
 
 class ObjectId(object):
@@ -310,38 +311,36 @@ class DataFileHandler(object):
         return obj_json
 
 
-class DBHandler(object):
+class DBHandler(Singleton):
     _db_url = None  # sqlite:///path/to/db
     _connection = None
-    _mode = DB_MODE_SD
     _tz = pd.Timedelta(DEFAULT_TZ)
 
-    def __init__(self, mode=DB_MODE_SD, tz=DEFAULT_TZ):
-        DBHandler.set_mode(mode)
-        DBHandler.set_tz(tz)
+    def __init__(self, db_path=None, tz=None):
+        super().__init__()
+        if tz is None:
+            if self._tz is None:
+                self.set_tz(DEFAULT_TZ)
+        else:
+            self.set_tz(tz)
+        if db_path is not None:
+            self.register(db_path)
 
-    @staticmethod
-    def set_tz(tz=DEFAULT_TZ):
+    def set_tz(self, tz=DEFAULT_TZ):
         if PV_TZ.validate('tz', tz):
-            DBHandler._tz = pd.Timedelta(tz)
+            self._tz = pd.Timedelta(tz)
             return True
         else:
             return False
 
-    @staticmethod
-    def tz():
-        return DBHandler._tz
+    def tz(self):
+        return self._tz
 
-    @staticmethod
-    def set_mode(mode: int):
-        DBHandler._mode = mode
+    def register(self, db_url: str):
+        self._db_url = db_url
+        self.disconnect()
 
-    @staticmethod
-    def register(db_url: str):
-        DBHandler._db_url = db_url
-
-    @staticmethod
-    def query(service_id: str, table_type: str, fields: list = None, condition: str = None, owner_id: str = None):
+    def query(self, service_id: str, table_type: str, fields: list = None, condition: str = None, owner_id: str = None):
         table_name = DBHandler.get_table_name(service_id, table_type, owner_id)
         sql = 'SELECT '
         if fields is None:
@@ -350,36 +349,33 @@ class DBHandler(object):
             sql = sql + ', '.join(fields) + ' from ' + table_name
         if condition is not None:
             sql = sql + ' WHERE ' + condition
-        if 0 == DBHandler._mode:
-            return cx.read_sql(DBHandler._db_url, sql)
-        else:
-            return pd.read_sql_query(sql, DBHandler.connect())
+        result = None
+        try:
+            result = cx.read_sql(DBHandler._db_url, sql)
+        except:
+            result = pd.read_sql_query(sql, self.connect())
+        return result
 
-    @staticmethod
-    def connect():
-        if DBHandler._connection is None:
-            db_path = DBHandler._db_url.split('://')[1]
-            DBHandler._connection = sqlite3.connect(db_path)
-        return DBHandler._connection
+    def connect(self):
+        if self._connection is None:
+            db_path = self._db_url.split('://')[1]
+            self._connection = sqlite3.connect(db_path)
+        return self._connection
 
-    @staticmethod
-    def get_cursor():
-        cursor = DBHandler.connect().cursor()
+    def get_cursor(self):
+        cursor = self.connect().cursor()
         return cursor
 
-    @staticmethod
-    def commit():
-        DBHandler.connect().commit()
+    def commit(self):
+        self.connect().commit()
 
-    @staticmethod
-    def disconnect():
-        if DBHandler._connection is not None:
-            DBHandler._connection.close()
-            DBHandler._connection = None
+    def disconnect(self):
+        if self._connection is not None:
+            self._connection.close()
+            self._connection = None
 
-    @staticmethod
-    def get_fields(table_name: str):
-        cursor = DBHandler.get_cursor()
+    def get_fields(self, table_name: str):
+        cursor = self.get_cursor()
         res = cursor.execute("PRAGMA table_info('" + table_name + "')").fetchall()
         fields = []
         for item in res:
@@ -387,9 +383,8 @@ class DBHandler(object):
         fields.sort()
         return fields
 
-    @staticmethod
-    def get_tables():
-        cursor = DBHandler.get_cursor()
+    def get_tables(self):
+        cursor = self.get_cursor()
         res = cursor.execute("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name").fetchall()
         tables = []
         for item in res:
@@ -397,17 +392,15 @@ class DBHandler(object):
         tables.sort()
         return tables
 
-    @staticmethod
-    def exist_table(table_name: str):
-        return table_name in DBHandler.get_tables()
+    def exist_table(self, table_name: str):
+        return table_name in self.get_tables()
 
-    @staticmethod
-    def init_table(table_name: str, fields: dict):
-        if DBHandler._db_url is None:
+    def init_table(self, table_name: str, fields: dict):
+        if self._db_url is None:
             raise ValueError(logger.error([5700]))
         else:
             if PV_DB_DEFINITION.validate('field', fields):
-                cursor = DBHandler.get_cursor()
+                cursor = self.get_cursor()
                 # 如果存在table，先drop掉
                 sql = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{}'".format(table_name)
                 cursor.execute(sql)
@@ -420,14 +413,13 @@ class DBHandler(object):
                     fields_def.append('[' + key + '] ' + value)
                 sql = "CREATE TABLE IF NOT EXISTS {}({})".format(table_name, ", ".join(fields_def))
                 cursor.execute(sql)
-                DBHandler.commit()
+                self.commit()
                 cursor.close()
             else:
                 raise ValueError(logger.error([5703]))
 
-    @staticmethod
-    def add(data: dict, table_name: str):
-        cursor = DBHandler.get_cursor()
+    def add(self, data: dict, table_name: str):
+        cursor = self.get_cursor()
         keys = []
         values = []
         for key, value in data.items():
@@ -438,31 +430,28 @@ class DBHandler(object):
         sql = "INSERT OR IGNORE INTO {} ({}) VALUES ('{}');".format(table_name, columns, values)
         # logger.log(sql)
         cursor.execute(sql)
-        DBHandler.commit()
+        self.commit()
         cursor.close()
 
-    @staticmethod
-    def add_column(table_name: str, field_name: str, field_def: str):
-        cursor = DBHandler.get_cursor()
+    def add_column(self, table_name: str, field_name: str, field_def: str):
+        cursor = self.get_cursor()
         sql = "ALTER TABLE {} ADD COLUMN {} {};".format(table_name, field_name, field_def)
         cursor.execute(sql)
-        DBHandler.commit()
+        self.commit()
         cursor.close()
 
-    @staticmethod
-    def import_data(filename: str, table_name: str):
-        cursor = DBHandler.get_cursor()
+    def import_data(self, filename: str, table_name: str):
+        cursor = self.get_cursor()
         with open(filename, 'r') as fin:
             dr = csv.DictReader(fin)
             to_db = [tuple([row[field] for field in dr.fieldnames]) for row in dr]
             sql = 'INSERT OR IGNORE INTO ' + table_name + ' ' + str(tuple(dr.fieldnames)).replace("'", '')
             sql = sql + ' VALUES (' + ', '.join(list('?' * len(dr.fieldnames))) + ');'
             cursor.executemany(sql, to_db)
-            DBHandler.commit()
+            self.commit()
         cursor.close()
 
-    @staticmethod
-    def export_data(output_dir: str, service_id: str, table_type: str, owner_id: str = None):
+    def export_data(self, output_dir: str, service_id: str, table_type: str, owner_id: str = None):
         output_filename = None
         if table_type == TABLE_TYPE_DD or table_type == TABLE_TYPE_SDU:
             output_filename = service_id + FILE_EXT_BY_TABLE_TYPE[table_type]
@@ -475,7 +464,7 @@ class DBHandler(object):
             else:
                 raise ValueError(logger.error([5705, table_type]))
         output_filename = path.join(output_dir, output_filename)
-        df = DBHandler.query(service_id=service_id, table_type=table_type, owner_id=owner_id)
+        df = self.query(service_id=service_id, table_type=table_type, owner_id=owner_id)
         df.to_csv(output_filename, index=False)
 
     @staticmethod
@@ -688,7 +677,7 @@ class DataUnitService(object):
         return res
 
     def _load_dd(self):
-        self._dd = DBHandler.query(self.service_id, TABLE_TYPE_DD)
+        self._dd = DBHandler().query(self.service_id, TABLE_TYPE_DD)
 
     def _init_sdu(self):
         dd_tag = DataDictionary.query_dd(self.service_id, DD_TYPE_TAG)
@@ -705,9 +694,10 @@ class DataUnitService(object):
         return DBHandler.get_table_name(self.service_id, table_type, owner_id)
 
     def init_tables(self):
+        db = DBHandler()
         # 建立DD数据表
         dd_table_name = self._get_table_name(TABLE_TYPE_DD)
-        DBHandler.init_table(dd_table_name, FIELDS_DD)
+        db.init_table(dd_table_name, FIELDS_DD)
         # 初始化ddid数据
         ddid_content = []
         owner_mappings = {}
@@ -746,7 +736,7 @@ class DataUnitService(object):
         dd_filename = self._get_filename(FILE_TYPE_DD)
         DataUnitService.write_file(dd_filename, DD_HEADERS, ddid_content)
         # 导入数据到数据库表
-        DBHandler.import_data(dd_filename, dd_table_name)
+        db.import_data(dd_filename, dd_table_name)
         # 初始化_dd
         self._load_dd()
         # 建立SDU数据表
@@ -757,7 +747,7 @@ class DataUnitService(object):
             # TODO：待删除的临时打印信息
             logger.log(tag)
             sdu_fields[tag] = 'INT'
-        DBHandler.init_table(sdu_table_name, sdu_fields)
+        db.init_table(sdu_table_name, sdu_fields)
         # 初始化SDU数据
         sdu_content = {}
         sdu_headers = ['owner']
@@ -773,7 +763,7 @@ class DataUnitService(object):
         sdu_filename = self._get_filename(FILE_TYPE_SDU)
         DataUnitService.write_file(sdu_filename, sdu_headers, sdu_content)
         # 导入数据到数据库表
-        DBHandler.import_data(sdu_filename, sdu_table_name)
+        db.import_data(sdu_filename, sdu_table_name)
         # 初始化_sdu
         self._init_sdu()
         # 建立TDU数据表
@@ -783,7 +773,7 @@ class DataUnitService(object):
             tdu_fields[metric] = 'VARCHAR(16)'
         for owner_desc, owner_oid in owner_mappings.items():
             tdu_table_name = self._get_table_name(TABLE_TYPE_TDU, owner_oid)
-            DBHandler.init_table(tdu_table_name, tdu_fields)
+            db.init_table(tdu_table_name, tdu_fields)
             raw_data = self._read_tdu_raw_data(owner_desc)
             raw_data.rename(columns=metric_mappings, inplace=True)
             raw_data['timestamp'] = raw_data['timestamp'].apply(lambda x: moment(x).format('X.SSS')).astype('string')
@@ -792,7 +782,7 @@ class DataUnitService(object):
             tdu_filename = self._get_filename(FILE_TYPE_TDU, owner_oid)
             DataUnitService.write_file(tdu_filename, None, raw_data)
             # 导入数据到数据库表
-            DBHandler.import_data(tdu_filename, tdu_table_name)
+            db.import_data(tdu_filename, tdu_table_name)
         # TODO：待验证
         self._init_tdu()
 
@@ -824,7 +814,7 @@ class DataUnitService(object):
 
     def import_data(self, file_type, table_name, *args):
         filename = self._get_filename(file_type, *args)
-        DBHandler.import_data(filename, table_name)
+        db.import_data(filename, table_name)
 
     def export_data(self, output_filename):
         pass
@@ -889,6 +879,7 @@ class DataUnit(object):
             self._service_id = service_id
         else:
             raise ValueError(logger.error([4500]))
+        self._db = DBHandler()
 
     @property
     def service_id(self):
@@ -928,20 +919,20 @@ class DataDictionary(DataUnit):
     def __init__(self, service_id: str):
         super().__init__(service_id)
         self._data = None
-        if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD)):
+        if self._db.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD)):
             pass
         else:
-            DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD), FIELDS_DD)
+            self._db.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_DD), FIELDS_DD)
         self.reload()
 
     def reload(self):
-        self._data = DBHandler.query(self._service_id, TABLE_TYPE_DD)
+        self._data = self._db.query(self._service_id, TABLE_TYPE_DD)
 
     def sync_db(self, filename, init_flag=False):
         table_name = DBHandler.get_table_name(self._service_id, TABLE_TYPE_DD)
         if init_flag:
-            DBHandler.init_table(table_name, FIELDS_DD)
-        DBHandler.import_data(filename, table_name)
+            self._db.init_table(table_name, FIELDS_DD)
+        self._db.import_data(filename, table_name)
         self.reload()
 
     def get_oid(self, dd_type: str):
@@ -979,7 +970,7 @@ class DataDictionary(DataUnit):
     def query_dd(service_id: str, dd_type: str):
         if PV_SERVICE.validate(KEY_SERVICE_ID, service_id):
             if dd_type in DD_TYPES:
-                data = DBHandler.query(service_id, TABLE_TYPE_DD)
+                data = DBHandler().query(service_id, TABLE_TYPE_DD)
                 res = data[data[FIELD_DDID].str[0] == dd_type]
                 return res
             else:
@@ -1033,7 +1024,7 @@ class DataDictionary(DataUnit):
                 ddid = str(DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=self.service_id))
                 data = {FIELD_DDID: ddid, FIELD_DESC: kwargs['desc'], FIELD_OID_MASK: kwargs['oid_mask']}
                 dd_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_DD)
-                DBHandler.add(data, dd_table_name)
+                self._db.add(data, dd_table_name)
                 self.reload()
                 return ddid
         else:
@@ -1046,7 +1037,7 @@ class DataDictionary(DataUnit):
             ddid = str(DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=sid))
             data = {FIELD_DDID: ddid, FIELD_DESC: kwargs['desc'], FIELD_OID_MASK: kwargs['oid_mask']}
             dd_table_name = DBHandler.get_table_name(sid, TABLE_TYPE_DD)
-            DBHandler.add(data, dd_table_name)
+            DBHandler().add(data, dd_table_name)
             return ddid
         else:
             raise ValueError(logger.error([5806, kwargs]))
@@ -1060,7 +1051,7 @@ class DataDictionary(DataUnit):
         pass
 
     def export_data(self, output_dir):
-        DBHandler.export_data(output_dir, self.service_id, TABLE_TYPE_DD)
+        self._db.export_data(output_dir, self.service_id, TABLE_TYPE_DD)
 
 
 class TimeDataUnit(DataUnit):
@@ -1069,13 +1060,13 @@ class TimeDataUnit(DataUnit):
         super().__init__(service_id)
         if PV_ID.validate(KEY_OID, owner_id):
             self._owner_id = owner_id
-            if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id)):
-                self._metric = DBHandler.get_fields(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id))
+            if self._db.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id)):
+                self._metric = self._db.get_fields(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id))
                 self._metric.remove(FIELD_TIMESTAMP)
             else:
                 self._metric = DataDictionary.query_oid(service_id, DD_TYPE_METRIC)
                 tdu_fields = self.fields()
-                DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id), tdu_fields)
+                self._db.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id), tdu_fields)
             self._desc = {}
             data = DataDictionary.query_dd(service_id, DD_TYPE_METRIC)
             for index, row in data.iterrows():
@@ -1116,7 +1107,7 @@ class TimeDataUnit(DataUnit):
                         claus.append(c.format(*[moment(item).format(MOMENT_FORMAT)]))
                     condition = ' OR '.join(claus)
             try:
-                res = DBHandler.query(self._service_id, TABLE_TYPE_TDU, fields, condition, self.oid)
+                res = self._db.query(self._service_id, TABLE_TYPE_TDU, fields, condition, self.oid)
             except (DatabaseError, RuntimeError):
                 logger.error([2003])
                 res = pd.DataFrame(columns=self.fields().keys())
@@ -1130,7 +1121,7 @@ class TimeDataUnit(DataUnit):
 
     @staticmethod
     def to_date(data):
-        return pd.to_datetime(data, unit='s') + DBHandler.tz()
+        return pd.to_datetime(data, unit='s') + DBHandler().tz()
 
     def add(self, **kwargs):
         if len(kwargs) > 0 and PV_TDU_ADD.validates(kwargs):
@@ -1142,13 +1133,13 @@ class TimeDataUnit(DataUnit):
                 else:
                     ddid = DataDictionary.append(service_id=self.service_id, dd_type=DD_TYPE_METRIC, desc=key, oid_mask='')
                     metric_id = ddid[1:]
-                    DBHandler.add_column(tdu_table_name, metric_id, 'INT')
+                    self._db.add_column(tdu_table_name, metric_id, 'INT')
                     self._desc[key] = metric_id
                     self._metric.append(metric_id)
                     data[metric_id] = value
             data[FIELD_TIMESTAMP] = moment(kwargs['ts']).format('X.SSS')
             tdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_TDU, self.oid)
-            DBHandler.add(data, tdu_table_name)
+            self._db.add(data, tdu_table_name)
         else:
             raise ValueError(logger.warning([2001]))
 
@@ -1160,15 +1151,15 @@ class TimeDataUnit(DataUnit):
         table_name = DBHandler.get_table_name(self._service_id, TABLE_TYPE_TDU, self.oid)
         if init_flag:
             tdu_fields = self.fields()
-            DBHandler.init_table(table_name, tdu_fields)
-        DBHandler.import_data(filename, table_name)
+            self._db.init_table(table_name, tdu_fields)
+        self._db.import_data(filename, table_name)
 
     def import_data(self, filename, data_dict=None):
         # TODO 待实现
         pass
 
     def export_data(self, output_dir):
-        DBHandler.export_data(output_dir, self.service_id, TABLE_TYPE_TDU, self.oid)
+        self._db.export_data(output_dir, self.service_id, TABLE_TYPE_TDU, self.oid)
 
 
 class SpaceDataUnit(DataUnit):
@@ -1199,11 +1190,11 @@ class SpaceDataUnit(DataUnit):
         data = DataDictionary.query_dd(service_id, DD_TYPE_TAG_VALUE)
         for index, row in data.iterrows():
             self._desc[row[FIELD_DESC]] = row[KEY_DDID][1:]
-        if DBHandler.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_SDU)):
+        if self._db.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_SDU)):
             pass
         else:
-            DBHandler.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_SDU), self.fields())
-        self._data = DBHandler.query(self.service_id, TABLE_TYPE_SDU)
+            self._db.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_SDU), self.fields())
+        self._data = self._db.query(self.service_id, TABLE_TYPE_SDU)
 
     @property
     def tags(self):
@@ -1219,7 +1210,7 @@ class SpaceDataUnit(DataUnit):
         pass
 
     def add(self, **kwargs):
-        if PV_SDU_ADD.validates(kwargs):
+        if len(kwargs) > 0 and PV_SDU_ADD.validates(kwargs):
             data = {}
             sdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_SDU)
             for key, value in kwargs['data'].items():
