@@ -5,7 +5,7 @@ from mts.core import DataDictionary, DBHandler
 from mts.utils import checksum
 
 cwd = os.path.abspath(os.path.dirname(__file__))
-output_dir = os.path.join(cwd, 'output')
+output_dir = os.path.join(os.getcwd(), 'output')
 
 
 class TestDataDictionary(unittest.TestCase):

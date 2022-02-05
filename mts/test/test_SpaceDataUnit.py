@@ -10,7 +10,7 @@ cwd = os.path.abspath(os.path.dirname(__file__))
 class TestSpaceDataUnit(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        output_dir = os.path.join(cwd, 'output')
+        output_dir = os.path.join(os.getcwd(), 'output')
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         db_file_name = os.path.join(output_dir, 'sdu')

@@ -5,7 +5,7 @@ from mts.core import DBHandler, DataDictionaryId
 from mts.const import *
 
 cwd = os.path.abspath(os.path.dirname(__file__))
-output_dir = os.path.join(cwd, 'output')
+output_dir = os.path.join(os.getcwd(), 'output')
 db_file_name = os.path.join(output_dir, 'dbhandler')
 db_url = 'sqlite://' + db_file_name
 

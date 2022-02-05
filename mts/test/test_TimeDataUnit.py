@@ -5,7 +5,7 @@ from mts.core import TimeDataUnit, DBHandler, DataDictionary
 from mts.utils import checksum
 
 cwd = os.path.abspath(os.path.dirname(__file__))
-output_dir = os.path.join(cwd, 'output')
+output_dir = os.path.join(os.getcwd(), 'output')
 
 
 class TestTimeDataUnit(unittest.TestCase):
@@ -51,7 +51,6 @@ class TestTimeDataUnit(unittest.TestCase):
         # 常规无条件限制下的query测试
         df_01 = tdu.query()
         if df_01.empty:
-            DBHandler.set_mode(DB_MODE_SD)
             filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
             tdu.sync_db(filename)
             df_01 = tdu.query()

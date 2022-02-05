@@ -351,8 +351,8 @@ class DBHandler(Singleton):
             sql = sql + ' WHERE ' + condition
         result = None
         try:
-            result = cx.read_sql(DBHandler._db_url, sql)
-        except:
+            result = cx.read_sql(self._db_url, sql)
+        except (ModuleNotFoundError, AttributeError, ValueError, RuntimeError) as e:
             result = pd.read_sql_query(sql, self.connect())
         return result
 

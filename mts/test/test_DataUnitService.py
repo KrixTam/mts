@@ -12,7 +12,7 @@ class TestDataUnitService(unittest.TestCase):
         settings = {
             'service_id': '51',
             'ds_path': os.path.join(cwd, 'resources', 'ds'),
-            'bak_path': os.path.join(cwd, 'output'),
+            'bak_path': os.path.join(os.getcwd(), 'output'),
             'owners': ['苹果', '梨', '西瓜', '橘子', '橙子', '山竹', '香蕉'],
             'metrics': ['进货量/斤', '销量/斤'],
             'tags': [
@@ -36,7 +36,7 @@ class TestDataUnitService(unittest.TestCase):
                 },
             ]
         }
-        db_url = 'sqlite://' + os.path.join(cwd, 'output', 'mtsdb')
+        db_url = 'sqlite://' + os.path.join(os.getcwd(), 'output', 'mtsdb')
         logger.log(db_url)
         db = DBHandler(db_url)
         ds = DataUnitService(settings, True)
