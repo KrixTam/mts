@@ -1,5 +1,3 @@
-# coding: utf-8
-
 # works in Python 2 & 3
 class _Singleton(type):
     """ A metaclass that creates a Singleton base class when called. """
@@ -11,4 +9,5 @@ class _Singleton(type):
         return cls._instances[cls]
 
 
-class Singleton(_Singleton('SingletonMeta', (object,), {})): pass
+class Singleton(_Singleton('SingletonMeta', (object,), {})):
+    pass

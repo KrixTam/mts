@@ -1,7 +1,6 @@
 import unittest
-from mts.const import *
-from mts.core import DataDictionaryId
-from mts.utils import logger
+from mts.commons.const import *
+from mts.core.id import DataDictionaryId
 
 
 class TestDataDictionaryId(unittest.TestCase):
@@ -12,8 +11,30 @@ class TestDataDictionaryId(unittest.TestCase):
         b = DataDictionaryId(dd_type=DD_TYPE_OWNER, oid=int('a00548d4e5abb002', 16))
         self.assertEqual(b.oid, 'a00548d4e5abb002')
         self.assertEqual(b.dd_type, DD_TYPE_OWNER)
-        logger.log(a.__repr__())
-        logger.log(b.__repr__())
+        self.assertEqual(a.__repr__().split('\n')[0], 'DataDictionaryId(2a00548d4e5abb001)')
+        self.assertNotEqual(a.__repr__().split('\n')[0], b.__repr__().split('\n')[0])
+
+    def test_init_01(self):
+        a = DataDictionaryId(dd_type=DD_TYPE_OWNER, service_code=43)
+        b = DataDictionaryId(dd_type=DD_TYPE_OWNER, service_id='53')
+        self.assertNotEqual(a, b)
+        self.assertEqual(bin(a.value)[2:][:10], bin(b.value)[2:][:10])
+
+    def test_init_02(self):
+        with self.assertRaises(ValueError):
+            a = DataDictionaryId(dd_type=DD_TYPE_OWNER)
+
+    def test_init_03(self):
+        with self.assertRaises(ValueError):
+            a = DataDictionaryId(dd_type=1)
+
+    def test_init_04(self):
+        with self.assertRaises(ValueError):
+            a = DataDictionaryId()
+
+    def test_init_05(self):
+        with self.assertRaises(ValueError):
+            a = DataDictionaryId(dd_type=1, service_code=43)
 
     def test_error_construct_ddid_type(self):
         with self.assertRaises(TypeError):

@@ -25,13 +25,14 @@ for d in dirs:
         shutil.rmtree(d)
 
 test_modules = [
-    'mts.test.test_DBHandler',
-    'mts.test.test_DataDictionary',
-    'mts.test.test_DataDictionaryId',
-    'mts.test.test_DataUnitService',
-    'mts.test.test_ObjectId',
-    'mts.test.test_SpaceDataUnit',
-    'mts.test.test_TimeDataUnit'
+    'mts.test.core.id.test_ObjectId',
+    'mts.test.core.id.test_DataDictionaryId',
+    'mts.test.core.id.test_Service',
+    # 'mts.test.test_DataUnitService',
+    # 'mts.test.test_DBHandler',
+    # 'mts.test.test_DataDictionary',
+    # 'mts.test.test_SpaceDataUnit',
+    # 'mts.test.test_TimeDataUnit'
 ]
 
 # 执行测试用例

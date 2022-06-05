@@ -34,6 +34,7 @@ def checksum(filename):
 # 5700-5799：DBHandler
 # 5800-5899：DataDictionary
 # 5900-5999：DataFileHandler
+# 6000-6099：Service
 
 
 ERROR_DEF = {
@@ -80,6 +81,8 @@ ERROR_DEF = {
     '5808': '[{0}] query的参数oid值异常。',
     '5900': '[{0}] 成功读取文件"{1}"。',
     '5901': '[{0}] 找不到"{1}"。',
+    '6000': '[{0}] to_service_code参数类型异常，应该为int或8进制的str。',
+    '6001': '[{0}] Service Code值（{1}）异常，不在合理范围[{2}, {3}]内；系统保留Service的原值，不会对Service设置处理。',
 }
 
 logger = Logger(ERROR_DEF, 'mts')

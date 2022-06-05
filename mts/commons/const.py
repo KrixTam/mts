@@ -1,7 +1,7 @@
 from pandas import DataFrame
 from datetime import timedelta
 from ni.config import ParameterValidator
-from mts.utils import hex_str
+from mts.commons import hex_str
 from moment import moment
 
 

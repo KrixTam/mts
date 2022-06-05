@@ -1,7 +1,7 @@
 import unittest
-from mts.core import ObjectId
-from mts.const import *
-from mts.utils import logger
+from mts.core.id import ObjectId
+from mts.commons.const import *
+from mts.commons import logger
 
 
 class TestObjectId(unittest.TestCase):
@@ -15,7 +15,10 @@ class TestObjectId(unittest.TestCase):
         ts = ObjectId.timestamp(last_ts)
         d = ObjectId('a4059507fd30cfff')
         e = ObjectId.pack(service_code, ts)
+        ObjectId._pid = ObjectId._pid - 1
+        f = ObjectId.pack(service_code, ts)
         self.assertEqual(pid_code, ObjectId.unpack(str(d))[2])
+        self.assertNotEqual(ObjectId.unpack(e)[2], ObjectId.unpack(f)[2])
 
     def test_comp(self):
         a = ObjectId()
