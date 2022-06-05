@@ -25,6 +25,7 @@ for d in dirs:
         shutil.rmtree(d)
 
 test_modules = [
+    'mts.test.stats.test_Jaccard',
     'mts.test.core.id.test_ObjectId',
     'mts.test.core.id.test_DataDictionaryId',
     'mts.test.core.id.test_Service',

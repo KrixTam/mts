@@ -35,6 +35,7 @@ def checksum(filename):
 # 5800-5899：DataDictionary
 # 5900-5999：DataFileHandler
 # 6000-6099：Service
+# 6100-6199：similarity
 
 
 ERROR_DEF = {
@@ -83,6 +84,7 @@ ERROR_DEF = {
     '5901': '[{0}] 找不到"{1}"。',
     '6000': '[{0}] to_service_code参数类型异常，应该为int或8进制的str。',
     '6001': '[{0}] Service Code值（{1}）异常，不在合理范围[{2}, {3}]内；系统保留Service的原值，不会对Service设置处理。',
+    '6100': '[{0}] Jaccard相关方法的参数只能为set或者numpy.ndarray。',
 }
 
 logger = Logger(ERROR_DEF, 'mts')
