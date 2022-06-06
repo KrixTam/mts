@@ -260,12 +260,12 @@ PV_SDU_ADD = ParameterValidator({
     }
 })
 
-DEFAULT_TZ = '08:00:00'
+DEFAULT_TZ = '08:00'
 
 PV_TZ = ParameterValidator({
-    'tz': {
+    'timezone': {
         'type': 'string',
-        'pattern': '^(?:(?:([01]?\d|2[0-3]):)?([0-5]?\d):)?([0-5]?\d)$'
+        'pattern': '^[+-]?((2[0-3])|([0-1]?[0-9])):[0-5][0-9]$'
     }
 })
 

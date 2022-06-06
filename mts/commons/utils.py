@@ -1,6 +1,9 @@
-import hashlib
 from ni.config.tools import Logger
 from moment import moment
+
+
+# def get_timestamp(ori_data: str):
+#     m = moment(ori_data).format('x')
 
 
 def hex_str(num, bits):
@@ -11,17 +14,6 @@ def hex_str(num, bits):
     else:
         return res[bits:]
 
-
-def checksum(filename):
-    hash_md5 = hashlib.md5()
-    with open(filename, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-#
-# def get_timestamp(ori_data: str):
-#     m = moment(ori_data).format('x')
 
 # 1000-1999：DataUnitProcessor
 # 2000-2499：TimeDataUnit
@@ -63,7 +55,7 @@ ERROR_DEF = {
     '5601': '[{0}] 构建DataDictionaryId时，遇到异常的参数{1}。',
     '5602': '[{0}] ddid应为17位长度的字符串，或者是DataDictionaryId实例。',
     '5603': '[{0}] 异常：非法ddid。',
-    '5700': '[{0}] DBConnector需要对db_url进行登记(register)后方能使用。',
+    '5700': '[{0}] DBHandler需要对db_url进行登记(register)后方能使用。',
     '5701': '[{0}] 参数table_type应为({1})。',
     '5702': '[{0}] 参数owner_id不能为None。',
     '5703': '[{0}] init_table参数fields值异常',
@@ -71,6 +63,7 @@ ERROR_DEF = {
     '5705': '[{0}] export_data的参数table_type值异常，暂不支持该table_type({1})。',
     '5706': '[{0}] get_table_name的参数owner_id值异常。',
     '5707': '[{0}] export_data的参数owner_id不能为None。',
+    '5708': '[{0}] DBHandler初始化参数timezone值（"{1}"）异常。',
     '5800': '[{0}] query的参数dd_type值异常。',
     '5801': '[{0}] 异常：未能识别的dd_type({1})。',
     '5802': '[{0}] query_dd的参数service_id值异常。',

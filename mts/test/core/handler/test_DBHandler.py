@@ -1,10 +1,11 @@
 import os
 import unittest
 import pandas as pd
-from mts.core import DBHandler, DataDictionaryId
-from mts.const import *
+from mts.core.handler import DBHandler, DataFileHandler
+from mts.core.id import DataDictionaryId, Service
+from mts.commons.const import *
 
-cwd = os.path.abspath(os.path.dirname(__file__))
+cwd = os.path.abspath(os.path.dirname(__file__)).split('core')[0]
 output_dir = os.path.join(os.getcwd(), 'output')
 db_file_name = os.path.join(output_dir, 'dbhandler')
 db_url = 'sqlite://' + db_file_name
@@ -42,6 +43,24 @@ class TestDBHandler(unittest.TestCase):
         self.assertEqual(df['ddid'][0], df_01['ddid'][0])
         df_02 = db.query(service_id, TABLE_TYPE_DD, ['desc', 'ddid'], "desc = '苹果' OR desc = '香蕉'")
         self.assertEqual(len(df_02.index), 2)
+        # 测试导出功能
+        db.export_data(output_dir, service_id, TABLE_TYPE_DD)
+        output_filename = os.path.join(output_dir, '51.dd')
+        self.assertEqual(DataFileHandler.checksum(dd_file_name), DataFileHandler.checksum(output_filename))
+
+    def test_get_table_name(self):
+        service_id = '51'
+        owner_id = 'a405ac45493b2000'
+        self.assertEqual(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id), 'tdu_51_a405ac45493b2000')
+        self.assertEqual(DBHandler.get_table_name(service_id, TABLE_TYPE_SDU), 'sdu_51')
+
+    def test_fail_set_timezone(self):
+        db = DBHandler()
+        self.assertFalse(db.set_timezone('+24:00'))
+
+    def test_export_data_tdu(self):
+        # TODO
+        db = DBHandler()
 
     def test_init_table_and_get_fields_sd(self):
         db = DBHandler(db_url)
@@ -65,7 +84,7 @@ class TestDBHandler(unittest.TestCase):
     def test_add_01(self):
         db = DBHandler(db_url)
         service_id = '53'
-        sc = int(service_id, 8)
+        sc = Service.to_service_code(service_id)
         ddid = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_code=sc)
         data = {'ddid': str(ddid), 'desc': '测试项', 'oid_mask': ''}
         dd_table_name = db.get_table_name(service_id, TABLE_TYPE_DD)
@@ -73,6 +92,14 @@ class TestDBHandler(unittest.TestCase):
         db.add(data, dd_table_name)
         res = db.query(service_id, TABLE_TYPE_DD)
         self.assertEqual(res['ddid'][0], str(ddid))
+        import sys
+        if 'connectorx' in sys.modules:
+            cx_module = sys.modules['connectorx']
+            read_sql_ori = cx_module.read_sql
+            cx_module.read_sql = 'abc'
+            res = db.query(service_id, TABLE_TYPE_DD)
+            self.assertEqual(res['ddid'][0], str(ddid))
+            cx_module.read_sql = read_sql_ori
 
     def test_add_02(self):
         db = DBHandler(db_url)
@@ -100,10 +127,6 @@ class TestDBHandler(unittest.TestCase):
         self.assertFalse('abc' in db.get_fields(dd_table_name))
         db.add_column(dd_table_name, 'abc', 'REAL')
         self.assertTrue('abc' in db.get_fields(dd_table_name))
-
-    def test_fail_set_tz(self):
-        db = DBHandler(db_url)
-        self.assertFalse(db.set_tz(8))
 
     def test_disconnect(self):
         db = DBHandler(db_url)

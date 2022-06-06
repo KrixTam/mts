@@ -1,2 +1,2 @@
-from .utils import logger, hex_str, checksum
+from .utils import logger, hex_str
 from .singleton import Singleton
