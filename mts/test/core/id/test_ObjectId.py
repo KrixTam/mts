@@ -1,5 +1,5 @@
 import unittest
-from mts.core.id import ObjectId
+from mts.core.id import ObjectId, Service
 from mts.commons.const import *
 from mts.commons import logger
 
@@ -142,6 +142,11 @@ class TestObjectId(unittest.TestCase):
         with self.assertRaises(TypeError):
             oid >= 2
 
+    def test_sid(self):
+        ObjectId.register({'service_code': 43})
+        oid = ObjectId()
+        self.assertEqual(Service.to_service_id(43), oid.sid)
+
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main()  # pragma: no cover

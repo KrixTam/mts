@@ -1,6 +1,6 @@
 import unittest
 from mts.commons.const import *
-from mts.core.id import DataDictionaryId
+from mts.core.id import DataDictionaryId, Service
 
 
 class TestDataDictionaryId(unittest.TestCase):
@@ -128,6 +128,13 @@ class TestDataDictionaryId(unittest.TestCase):
         with self.assertRaises(TypeError):
             a >= 123
 
+    def test_sid(self):
+        a = DataDictionaryId(dd_type=DD_TYPE_OWNER, service_code=43)
+        self.assertEqual(Service.to_service_id(43), a.sid)
+
+    def test_validate(self):
+        self.assertTrue(DataDictionaryId.validate(int('2a00548d4e5abb001', 16)))
+
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main()  # pragma: no cover

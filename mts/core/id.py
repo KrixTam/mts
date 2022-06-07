@@ -181,6 +181,10 @@ class ObjectId(object):
     def value(self):
         return self._id
 
+    @property
+    def sid(self):
+        return Service.to_service_id((self._id >> SERVICE_CODE_BITS_SHIFT) & SERVICE_CODE_MASK)
+
     def __eq__(self, other):
         if isinstance(other, ObjectId):
             return self.value == other.value
@@ -277,25 +281,31 @@ class DataDictionaryId(object):
                     raise TypeError(logger.error([5602]))
         dd_type = ddid_value >> DD_TYPE_BITS_SHIFT
         oid = ddid_value & OID_MASK
-        if DataDictionaryId._validate(dd_type, oid):
+        if DataDictionaryId.validate_raw(dd_type, oid):
             return dd_type, oid
         else:
             raise ValueError(logger.error([5603]))
 
     @staticmethod
     def pack(dd_type: int, oid: int):
-        if DataDictionaryId._validate(dd_type, oid):
+        if DataDictionaryId.validate_raw(dd_type, oid):
             ddid = (dd_type << DD_TYPE_BITS_SHIFT) | oid
             return ddid
         else:
             raise ValueError(logger.error([5603]))
 
     @staticmethod
-    def _validate(dd_type: int, oid: int):
+    def validate_raw(dd_type: int, oid: int):
         if ObjectId.validate(oid) and hex_str(dd_type, 1) in DD_TYPES:
             return True
         else:
             return False
+
+    @staticmethod
+    def validate(ddid: int):
+        dd_type = ddid >> DD_TYPE_BITS_SHIFT
+        oid = ddid & OID_MASK
+        return DataDictionaryId.validate_raw(dd_type, oid)
 
     @property
     def value(self):
@@ -308,6 +318,10 @@ class DataDictionaryId(object):
     @property
     def oid(self):
         return hex_str(self.value, -16)
+
+    @property
+    def sid(self):
+        return Service.to_service_id((self._id >> SERVICE_CODE_BITS_SHIFT) & SERVICE_CODE_MASK)
 
     def __eq__(self, other):
         if isinstance(other, DataDictionaryId):

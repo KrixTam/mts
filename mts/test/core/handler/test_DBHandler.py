@@ -1,6 +1,6 @@
 import os
 import unittest
-import pandas as pd
+from mts.commons.singleton import _Singleton
 from mts.core.handler import DBHandler, DataFileHandler
 from mts.core.id import DataDictionaryId, Service
 from mts.commons.const import *
@@ -17,54 +17,34 @@ class TestDBHandler(unittest.TestCase):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         if os.path.exists(db_file_name):
-            os.remove(db_file_name)
+            os.remove(db_file_name)  # pragma: no cover
 
-    def test_all(self):
-        db = DBHandler(db_url)
-        service_id = '51'
-        dd_table_name = DBHandler.get_table_name(service_id, TABLE_TYPE_DD)
-        self.assertFalse(dd_table_name in db.get_tables())
-        db.init_table(dd_table_name, FIELDS_DD)
-        self.assertTrue(dd_table_name in db.get_tables())
-        fields = db.get_fields(dd_table_name)
-        fields.sort()
-        fields_dd = list(FIELDS_DD.keys())
-        fields_dd.sort()
-        self.assertEqual(fields, fields_dd)
-        df = db.query(service_id, TABLE_TYPE_DD)
-        self.assertTrue(df.empty)
-        dd_file_name = os.path.join(cwd, 'resources', 'ds', '51.dd')
-        db.import_data(dd_file_name, dd_table_name)
-        df = db.query(service_id, TABLE_TYPE_DD)
-        self.assertFalse(df.empty)
-        df = db.query(service_id, TABLE_TYPE_DD, ['desc', 'ddid'], "desc = '颜色'")
-        self.assertEqual(df['ddid'][0], '3a4059507fd30c005')
-        df_01 = db.query(service_id, TABLE_TYPE_DD, ['desc', 'ddid'], "desc = '颜色'")
-        self.assertEqual(df['ddid'][0], df_01['ddid'][0])
-        df_02 = db.query(service_id, TABLE_TYPE_DD, ['desc', 'ddid'], "desc = '苹果' OR desc = '香蕉'")
-        self.assertEqual(len(df_02.index), 2)
-        # 测试导出功能
-        db.export_data(output_dir, service_id, TABLE_TYPE_DD)
-        output_filename = os.path.join(output_dir, '51.dd')
-        self.assertEqual(DataFileHandler.checksum(dd_file_name), DataFileHandler.checksum(output_filename))
+    def setUp(self):
+        if DBHandler in _Singleton._instances:
+            del _Singleton._instances[DBHandler]
 
-    def test_get_table_name(self):
-        service_id = '51'
-        owner_id = 'a405ac45493b2000'
-        self.assertEqual(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id), 'tdu_51_a405ac45493b2000')
-        self.assertEqual(DBHandler.get_table_name(service_id, TABLE_TYPE_SDU), 'sdu_51')
+    def test_init_01(self):
+        db = DBHandler()
+        with self.assertRaises(ValueError):
+            db.connect()
+
+    def test_init_02(self):
+        with self.assertRaises(ValueError):
+            db = DBHandler(db_url, '+24:00')
 
     def test_fail_set_timezone(self):
         db = DBHandler()
         self.assertFalse(db.set_timezone('+24:00'))
 
-    def test_export_data_tdu(self):
-        # TODO
-        db = DBHandler()
-
-    def test_init_table_and_get_fields_sd(self):
+    def test_exist_table(self):
         db = DBHandler(db_url)
-        dd_table_name = DBHandler.get_table_name('52', TABLE_TYPE_DD)
+        self.assertFalse(db.exist_table('51_dd'))
+        db.disconnect()
+        self.assertFalse(db.is_connect())
+
+    def test_basic(self):
+        db = DBHandler(db_url)
+        dd_table_name = 'dd_51'
         self.assertFalse(dd_table_name in db.get_tables())
         db.init_table(dd_table_name, FIELDS_DD)
         self.assertTrue(dd_table_name in db.get_tables())
@@ -73,111 +53,70 @@ class TestDBHandler(unittest.TestCase):
         fields_dd = list(FIELDS_DD.keys())
         fields_dd.sort()
         self.assertEqual(fields, fields_dd)
-        self.assertTrue(db.exist_table(dd_table_name))
-        self.assertFalse(db.exist_table('abc'))
+        # 导入测试
+        df = db.query(dd_table_name)
+        self.assertTrue(df.empty)
+        dd_file_name = os.path.join(cwd, 'resources', 'ds', '51.dd')
+        db.import_data(dd_file_name, dd_table_name)
+        df = db.query(dd_table_name)
+        self.assertFalse(df.empty)
+        # 查询测试
+        df = db.query(dd_table_name, ['desc', 'ddid'], "desc = '颜色'")
+        self.assertEqual(df['ddid'][0], '3a4059507fd30c005')
+        df_01 = db.query(dd_table_name, ['desc', 'ddid'], "desc = '颜色'")
+        self.assertEqual(df['ddid'][0], df_01['ddid'][0])
+        df_02 = db.query(dd_table_name, ['desc', 'ddid'], "desc = '苹果' OR desc = '香蕉'")
+        self.assertEqual(len(df_02.index), 2)
+        # 测试导出功能
+        db.export_data(output_dir, dd_table_name)
+        output_filename = os.path.join(output_dir, dd_table_name + '.csv')
+        self.assertEqual(DataFileHandler.checksum(dd_file_name), DataFileHandler.checksum(output_filename))
+        # 测试重复初始化表格
+        db.init_table(dd_table_name, FIELDS_DD)
+        df = db.query(dd_table_name)
+        self.assertTrue(df.empty)
 
-    def test_error(self):
+    def test_error_init_table_01(self):
+        db = DBHandler()
+        with self.assertRaises(ValueError):
+            dd_table_name = 'dd_52'
+            db.init_table(dd_table_name, FIELDS_DD)
+
+    def test_error_init_table_02(self):
         db = DBHandler(db_url)
         with self.assertRaises(ValueError):
-            db.get_table_name(52, TABLE_TYPE_DD)
+            dd_table_name = 'dd_52'
+            db.init_table(dd_table_name, {'a123': 123})
 
-    def test_add_01(self):
+    def test_add(self):
         db = DBHandler(db_url)
         service_id = '53'
         sc = Service.to_service_code(service_id)
         ddid = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_code=sc)
         data = {'ddid': str(ddid), 'desc': '测试项', 'oid_mask': ''}
-        dd_table_name = db.get_table_name(service_id, TABLE_TYPE_DD)
+        dd_table_name = 'dd_' + service_id
         db.init_table(dd_table_name, FIELDS_DD)
         db.add(data, dd_table_name)
-        res = db.query(service_id, TABLE_TYPE_DD)
+        res = db.query(dd_table_name)
         self.assertEqual(res['ddid'][0], str(ddid))
         import sys
         if 'connectorx' in sys.modules:
             cx_module = sys.modules['connectorx']
             read_sql_ori = cx_module.read_sql
             cx_module.read_sql = 'abc'
-            res = db.query(service_id, TABLE_TYPE_DD)
+            res = db.query(dd_table_name)
             self.assertEqual(res['ddid'][0], str(ddid))
             cx_module.read_sql = read_sql_ori
-
-    def test_add_02(self):
-        db = DBHandler(db_url)
-        service_id = '54'
-        ddid = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_id=service_id)
-        data = {'ddid': str(ddid), 'desc': '测试项02', 'oid_mask': ''}
-        dd_table_name = db.get_table_name(service_id, TABLE_TYPE_DD)
-        db.init_table(dd_table_name, FIELDS_DD)
-        db.add(data, dd_table_name)
-        res = db.query(service_id, TABLE_TYPE_DD)
-        self.assertEqual(res['ddid'][0], str(ddid))
-        # 测试导出功能
-        db.export_data(output_dir, service_id, TABLE_TYPE_DD)
-        file_des = os.path.join(output_dir, '54.dd')
-        df = pd.read_csv(file_des, dtype=str)
-        self.assertEqual(1, len(df.index))
-        self.assertEqual('测试项02', df['desc'][0])
-        self.assertEqual(str(ddid), df['ddid'][0])
 
     def test_add_column(self):
         db = DBHandler(db_url)
         service_id = '54'
-        dd_table_name = db.get_table_name(service_id, TABLE_TYPE_DD)
+        dd_table_name = 'dd_' + service_id
         db.init_table(dd_table_name, FIELDS_DD)
         self.assertFalse('abc' in db.get_fields(dd_table_name))
         db.add_column(dd_table_name, 'abc', 'REAL')
         self.assertTrue('abc' in db.get_fields(dd_table_name))
 
-    def test_disconnect(self):
-        db = DBHandler(db_url)
-        db.connect()
-        db.disconnect()
-        self.assertTrue(True)
-
-    def test_error_init_table_01(self):
-        db = DBHandler(db_url)
-        with self.assertRaises(ValueError):
-            db.register(None)
-            dd_table_name = db.get_table_name('52', TABLE_TYPE_DD)
-            db.init_table(dd_table_name, FIELDS_DD)
-        db.register(db_url)
-
-    def test_error_init_table_02(self):
-        db = DBHandler(db_url)
-        with self.assertRaises(ValueError):
-            dd_table_name = db.get_table_name('57', TABLE_TYPE_DD)
-            db.init_table(dd_table_name, {'a123': 123})
-
-    def test_error_export_data_01(self):
-        db = DBHandler(db_url)
-        with self.assertRaises(ValueError):
-            service_id = '51'
-            db.export_data(output_dir, service_id, TABLE_TYPE_TDU)
-
-    def test_error_export_data_02(self):
-        db = DBHandler(db_url)
-        with self.assertRaises(ValueError):
-            service_id = '51'
-            db.export_data(output_dir, service_id, 'new_type')
-
-    def test_error_get_table_name_01(self):
-        db = DBHandler(db_url)
-        with self.assertRaises(ValueError):
-            service_id = '51'
-            db.get_table_name(service_id, 'new_type')
-
-    def test_error_get_table_name_02(self):
-        db = DBHandler(db_url)
-        with self.assertRaises(ValueError):
-            service_id = '51'
-            db.get_table_name(service_id, TABLE_TYPE_TDU)
-
-    def test_error_get_table_name_03(self):
-        db = DBHandler(db_url)
-        with self.assertRaises(ValueError):
-            service_id = '51'
-            db.get_table_name(service_id, TABLE_TYPE_TDU, 'adfafdafdafda')
-
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main()  # pragma: no cover

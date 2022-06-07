@@ -36,14 +36,14 @@ class DBHandler(Singleton):
     _connection = None
     timezone = None
 
-    def __init__(self, db_path=None, timezone: str = DEFAULT_TZ):
+    def __init__(self, db_url: str = None, timezone: str = DEFAULT_TZ):
         super().__init__()
+        if db_url is not None:
+            self.register(db_url)
         if self.set_timezone(timezone):
             pass
         else:
-            raise ValueError(logger.warning([5708, timezone]))  # pragma: no cover
-        if db_path is not None:
-            self.register(db_path)
+            raise ValueError(logger.warning([5708, timezone]))
 
     def set_timezone(self, timezone: str = DEFAULT_TZ):
         if PV_TZ.validate('timezone', timezone):
@@ -56,8 +56,8 @@ class DBHandler(Singleton):
         self._db_url = db_url
         self.disconnect()
 
-    def query(self, service_id: str, table_type: str, fields: list = None, condition: str = None, owner_id: str = None):
-        table_name = DBHandler.get_table_name(service_id, table_type, owner_id)
+    def query(self, table_name: str, fields: list = None, condition: str = None):
+        # table_name = DBHandler.get_table_name(service_id, table_type, owner_id)
         sql = 'SELECT '
         if fields is None:
             sql = sql + '* from ' + table_name
@@ -65,7 +65,6 @@ class DBHandler(Singleton):
             sql = sql + ', '.join(fields) + ' from ' + table_name
         if condition is not None:
             sql = sql + ' WHERE ' + condition
-        # result = None
         try:
             result = cx.read_sql(self._db_url, sql)
         except (ModuleNotFoundError, AttributeError, ValueError, TypeError, RuntimeError) as e:
@@ -74,6 +73,8 @@ class DBHandler(Singleton):
 
     def connect(self):
         if self._connection is None:
+            if self._db_url is None:
+                raise ValueError(logger.error([5700]))
             db_path = self._db_url.split('://')[1]
             self._connection = sqlite3.connect(db_path)
         return self._connection
@@ -85,8 +86,11 @@ class DBHandler(Singleton):
     def commit(self):
         self.connect().commit()
 
+    def is_connect(self):
+        return self._connection is not None
+
     def disconnect(self):
-        if self._connection is not None:
+        if self.is_connect():
             self._connection.close()
             self._connection = None
 
@@ -167,40 +171,8 @@ class DBHandler(Singleton):
             self.commit()
         cursor.close()
 
-    def export_data(self, output_dir: str, service_id: str, table_type: str, owner_id: str = None):
-        output_filename = None
-        if table_type == TABLE_TYPE_DD or table_type == TABLE_TYPE_SDU:
-            output_filename = service_id + FILE_EXT_BY_TABLE_TYPE[table_type]
-        else:
-            if table_type == TABLE_TYPE_TDU:
-                if owner_id is None:
-                    raise ValueError(logger.error([5707]))
-                else:
-                    output_filename = service_id + '_' + owner_id + FILE_EXT_BY_TABLE_TYPE[table_type]
-            else:
-                raise ValueError(logger.error([5705, table_type]))
+    def export_data(self, output_dir: str, table_name: str, owner_id: str = None):
+        output_filename = table_name + '.csv'
         output_filename = path.join(output_dir, output_filename)
-        df = self.query(service_id=service_id, table_type=table_type, owner_id=owner_id)
+        df = self.query(table_name)
         df.to_csv(output_filename, index=False)
-
-    @staticmethod
-    def get_table_name(service_id: str, table_type: str, owner_id: str = None):
-        if PV_SERVICE.validate(KEY_SERVICE_ID, service_id):
-            if table_type in TABLE_TYPE:
-                if table_type == TABLE_TYPE_DD:
-                    return 'dd_' + service_id
-                else:
-                    if table_type == TABLE_TYPE_SDU:
-                        return 'sdu_' + service_id
-                    else:
-                        if owner_id is None:
-                            raise ValueError(logger.error([5702]))
-                        else:
-                            if PV_ID.validate(KEY_OID, owner_id):
-                                return 'tdu_' + service_id + '_' + owner_id
-                            else:
-                                raise ValueError(logger.error([5706]))
-            else:
-                raise ValueError(logger.error([5701, TABLE_TYPE]))
-        else:
-            raise ValueError(logger.error([5704]))
