@@ -31,6 +31,7 @@ test_modules = [
     'mts.test.core.id.test_Service',
     'mts.test.core.handler.test_DBHandler',
     'mts.test.core.handler.test_DataFileHandler',
+    'mts.test.core.datamodel.test_DataDictionary',
     # 'mts.test.test_DataUnitService',
     # 'mts.test.test_DataDictionary',
     # 'mts.test.test_SpaceDataUnit',

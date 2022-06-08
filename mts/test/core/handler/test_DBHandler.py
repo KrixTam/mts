@@ -117,6 +117,38 @@ class TestDBHandler(unittest.TestCase):
         db.add_column(dd_table_name, 'abc', 'REAL')
         self.assertTrue('abc' in db.get_fields(dd_table_name))
 
+    def test_remove_01(self):
+        db = DBHandler(db_url)
+        service_id = '55'
+        dd_table_name = 'dd_' + service_id
+        db.init_table(dd_table_name, FIELDS_DD)
+        self.assertEqual(len(db.query(dd_table_name)['ddid'].tolist()), 0)
+        ddid_01 = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_id=service_id)
+        data = {'ddid': str(ddid_01), 'desc': '测试项_01', 'oid_mask': ''}
+        db.add(data, dd_table_name)
+        ddid_02 = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_id=service_id)
+        data = {'ddid': str(ddid_02), 'desc': '测试项_02', 'oid_mask': ''}
+        db.add(data, dd_table_name)
+        self.assertEqual(len(db.query(dd_table_name)['ddid'].tolist()), 2)
+        db.remove(dd_table_name)
+        self.assertEqual(len(db.query(dd_table_name)['ddid'].tolist()), 0)
+
+    def test_remove_02(self):
+        db = DBHandler(db_url)
+        service_id = '55'
+        dd_table_name = 'dd_' + service_id
+        db.init_table(dd_table_name, FIELDS_DD)
+        self.assertEqual(len(db.query(dd_table_name)['ddid'].tolist()), 0)
+        ddid_01 = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_id=service_id)
+        data = {'ddid': str(ddid_01), 'desc': '测试项_01', 'oid_mask': ''}
+        db.add(data, dd_table_name)
+        ddid_02 = DataDictionaryId(dd_type=DD_TYPE_METRIC, service_id=service_id)
+        data = {'ddid': str(ddid_02), 'desc': '测试项_02', 'oid_mask': ''}
+        db.add(data, dd_table_name)
+        self.assertEqual(len(db.query(dd_table_name)['ddid'].tolist()), 2)
+        db.remove(dd_table_name, 'ddid="' + str(ddid_02) + '"')
+        self.assertEqual(db.query(dd_table_name)['ddid'].tolist(), [str(ddid_01)])
+
 
 if __name__ == '__main__':
     unittest.main()  # pragma: no cover

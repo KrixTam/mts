@@ -57,7 +57,6 @@ class DBHandler(Singleton):
         self.disconnect()
 
     def query(self, table_name: str, fields: list = None, condition: str = None):
-        # table_name = DBHandler.get_table_name(service_id, table_type, owner_id)
         sql = 'SELECT '
         if fields is None:
             sql = sql + '* from ' + table_name
@@ -147,8 +146,17 @@ class DBHandler(Singleton):
             values.append(str(value))
         columns = ', '.join(keys)
         values = "', '".join(values)
-        sql = "INSERT OR IGNORE INTO {} ({}) VALUES ('{}');".format(table_name, columns, values)
-        # logger.log(sql)
+        sql = "INSERT OR IGNORE INTO {} ({}) VALUES ('{}')".format(table_name, columns, values)
+        cursor.execute(sql)
+        self.commit()
+        cursor.close()
+
+    def remove(self, table_name: str, condition: str = None):
+        if condition is None:
+            sql = "DELETE FROM " + table_name
+        else:
+            sql = "DELETE FROM " + table_name + " WHERE " + condition
+        cursor = self.get_cursor()
         cursor.execute(sql)
         self.commit()
         cursor.close()
@@ -171,7 +179,7 @@ class DBHandler(Singleton):
             self.commit()
         cursor.close()
 
-    def export_data(self, output_dir: str, table_name: str, owner_id: str = None):
+    def export_data(self, output_dir: str, table_name: str):
         output_filename = table_name + '.csv'
         output_filename = path.join(output_dir, output_filename)
         df = self.query(table_name)

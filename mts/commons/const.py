@@ -46,29 +46,9 @@ FIELD_OWNER = 'owner'
 
 DD_HEADERS = FIELD_DDID + ',' + FIELD_DESC + ',' + FIELD_OID_MASK
 
-FILE_TYPE_DD = 'dd'
-FILE_TYPE_SDU = 'sdu'
-FILE_TYPE_TDU = 'tdu'
-FILE_TYPE_TDU_RAW = 'rtdu'
-
-TABLE_TYPE_DD = 'dd'
-TABLE_TYPE_SDU = 'sdu'
-TABLE_TYPE_TDU = 'tdu'
-
-TABLE_TYPE = [TABLE_TYPE_DD, TABLE_TYPE_SDU, TABLE_TYPE_TDU]
-
-FILE_EXT = {
-    FILE_TYPE_DD: '.dd',
-    FILE_TYPE_SDU: '.sdu',
-    FILE_TYPE_TDU: '.tdu',
-    FILE_TYPE_TDU_RAW: '.rtdu'
-}
-
-FILE_EXT_BY_TABLE_TYPE = {
-    TABLE_TYPE_DD: '.dd',
-    TABLE_TYPE_SDU: '.sdu',
-    TABLE_TYPE_TDU: '.tdu'
-}
+TABLE_PREFIX_DD = 'dd'
+TABLE_PREFIX_SDU = 'sdu'
+TABLE_PREFIX_TDU = 'tdu'
 
 FIELDS_DD = {FIELD_DDID: 'VARCHAR(17) PRIMARY KEY', FIELD_DESC: 'VARCHAR(160)', FIELD_OID_MASK: 'VARCHAR(32)'}
 
@@ -144,6 +124,10 @@ PV_DB_DEFINITION = ParameterValidator({
     }
 })
 
+PV_DD_REMOVE = ParameterValidator({
+    'ddid': DDID
+})
+
 PV_DD_QUERY = ParameterValidator({
     'dd_type': DD_TYPE,
     'desc': {
@@ -160,16 +144,6 @@ PV_DD_QUERY = ParameterValidator({
 })
 
 PV_DD_ADD = ParameterValidator({
-    'dd_type': DD_TYPE,
-    'desc': DESC,
-    'oid_mask': {
-        'type': 'string',
-        'pattern': '[a-f0-9]{0,32}'
-    }
-})
-
-PV_DD_APPEND = ParameterValidator({
-    'service_id': SERVICE_ID,
     'dd_type': DD_TYPE,
     'desc': DESC,
     'oid_mask': {
