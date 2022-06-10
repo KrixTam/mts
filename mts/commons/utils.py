@@ -28,6 +28,7 @@ def hex_str(num, bits):
 # 5900-5999：DataFileHandler
 # 6000-6099：Service
 # 6100-6199：similarity
+# 6200-6299：DataFragments
 
 
 ERROR_DEF = {
@@ -35,7 +36,7 @@ ERROR_DEF = {
     '1001': '[{0}] 参数ds的类型应为DataService或dict，而非{1}。',
     '2000': '[{0}] 调用TimeDataUnit的query方法，其参数不符合规范。',
     '2001': '[{0}] 调用TimeDataUnit的add方法，其参数不符合规范。',
-    '2002': '[{0}] 构建TimeDataUnit失败，owner_id值异常。',
+    # '2002': '[{0}] 构建TimeDataUnit失败，owner_id值异常。',
     '2003': '[{0}] TimeDataUnit对应的数据库表或相关字段不存在，或者DB异常，导致query失败。',
     '2500': '[{0}] 待导入文件{1}内容不符合SDU数据规则要求，请检查后重新执行导入操作',
     '2501': '[{0}] 调用SpaceDataUnit的add方法，其参数不符合规范。',
@@ -67,7 +68,6 @@ ERROR_DEF = {
     '5800': '[{0}] query的参数dd_type值异常。',
     '5801': '[{0}] 异常：未能识别的dd_type({1})。',
     '5802': '[{0}] remove的参数ddid值异常。',
-    # '5802': '[{0}] query_dd的参数service_id值异常。',
     '5803': '[{0}] query的参数desc值异常。',
     '5804': '[{0}] 新增数据{1}存在重复，无须进行重复插入操作',
     '5805': '[{0}] add参数{1}异常。',
@@ -79,6 +79,7 @@ ERROR_DEF = {
     '6000': '[{0}] to_service_code参数类型异常，应该为int或8进制的str。',
     '6001': '[{0}] Service Code值（{1}）异常，不在合理范围[{2}, {3}]内；系统保留Service的原值，不会对Service设置处理。',
     '6100': '[{0}] Jaccard相关方法的参数只能为set或者numpy.ndarray。',
+    '6200': '[{0}] 构建DataFragments失败，service_id值异常。',
 }
 
 logger = Logger(ERROR_DEF, 'mts')
