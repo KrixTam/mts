@@ -1,4 +1,4 @@
-from abc import abstractmethod, ABC
+from abc import abstractmethod
 import pandas as pd
 from mts.commons import logger
 from mts.commons.const import *
@@ -15,7 +15,7 @@ class DataUnit(object):
         else:
             raise ValueError(logger.error([4500]))
         self._db = DBHandler()
-        self._table_name = None
+        self._table_name = BLANK
         self._set_table_name()
         if self._db.exist_table(self._table_name):
             pass
@@ -115,26 +115,38 @@ class DataDictionary(DataUnit):
         return res
 
     def add(self, **kwargs):
-        if len(kwargs) > 0 and PV_DD_ADD.validates(kwargs):
-            duplicated = True
-            res = self.query(dd_type=kwargs[KEY_DD_TYPE], desc=[kwargs['desc']])
-            if res.empty:
-                duplicated = False
-            if duplicated:
-                logger.warning([5804, kwargs])
-                return res[KEY_DDID][0]
+        if (KEY_DD_TYPE in kwargs) and PV_DD_ADD.validate(KEY_DD_TYPE, kwargs[KEY_DD_TYPE]):
+            if (KEY_DESC in kwargs) and PV_DD_ADD.validate(KEY_DESC, kwargs[KEY_DESC]):
+                mask = MASK_DEFAULT
+                ddid = None
+                if (KEY_OID in kwargs) and PV_DD_ADD.validate(KEY_OID, kwargs[KEY_OID]):
+                    ddid = DataDictionaryId(ddid=kwargs[KEY_DD_TYPE]+kwargs[KEY_OID])
+                if (KEY_MASK in kwargs) and PV_DD_ADD.validate(KEY_MASK, kwargs[KEY_MASK]):
+                    mask = kwargs[KEY_MASK]
+                duplicated = True
+                res = self.query(dd_type=kwargs[KEY_DD_TYPE], desc=[kwargs[KEY_DESC]])
+                if res.empty:
+                    duplicated = False
+                if duplicated:
+                    logger.warning([5804, kwargs])
+                    return res[KEY_DDID][0]
+                else:
+                    if ddid is None:
+                        ddid = DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=self.sid)
+                    ddid_str = str(ddid)
+                    oid_mask = ddid.oid + mask
+                    data = {FIELD_DDID: ddid_str, FIELD_DESC: kwargs[KEY_DESC], FIELD_OID_MASK: oid_mask}
+                    self._db.add(data, self._table_name)
+                    self.load_data()
+                    return ddid_str
             else:
-                ddid = str(DataDictionaryId(dd_type=kwargs[KEY_DD_TYPE], service_id=self.sid))
-                data = {FIELD_DDID: ddid, FIELD_DESC: kwargs['desc'], FIELD_OID_MASK: kwargs['oid_mask']}
-                self._db.add(data, self._table_name)
-                self.load_data()
-                return ddid
+                raise ValueError(logger.error([5805, kwargs]))
         else:
             raise ValueError(logger.error([5805, kwargs]))
 
     def remove(self, ddid: str):
         if PV_DD_REMOVE.validate(KEY_DDID, ddid):
-            self._db.remove(self._table_name, 'ddid="' + ddid + '"')
+            self._db.remove(self._table_name, FIELD_DDID + '="' + ddid + '"')
             self.load_data()
         else:
             raise ValueError(logger.error([5802]))
@@ -151,11 +163,11 @@ class DataDictionary(DataUnit):
 
     def map_desc(self, oid: str, dd_type: str = None):
         if dd_type is None:
-            res = self.query(oid=oid)[FIELD_DESC]
+            res = self.query(oid=oid)[FIELD_DESC].tolist()
         else:
             ddid = dd_type + oid
-            res = self.query(ddid=[ddid])[FIELD_DESC]
-        if 1 == len(res.index):
+            res = self.query(ddid=[ddid])[FIELD_DESC].tolist()
+        if 1 == len(res):
             return res[0]
         else:
             return None
@@ -169,7 +181,7 @@ class DataFragments(object):
         else:
             raise ValueError(logger.error([6200]))
         self._data = {}
-        self._disp = {}
+        self._labels = {}
         self._key_type = None
         self._value_type = None
         self.init_key_and_value()
@@ -179,24 +191,48 @@ class DataFragments(object):
         dd = DataDictionary(self.sid)
         keys = dd.query(dd_type=self._key_type)
         values = dd.query(dd_type=self._value_type)
-        disp_01 = keys.copy()
-        disp_01[FIELD_OID] = disp_01[FIELD_DDID].apply(lambda x: x[1:])
-        disp_01.drop(columns=[FIELD_DDID, FIELD_OID_MASK], inplace=True)
-        disp_01[FIELD_MASK] = 0
-        disp_02 = values.copy()
-        disp_02[FIELD_OID] = disp_02[FIELD_OID_MASK].apply(lambda x: x[0:16])
-        disp_02[FIELD_MASK] = disp_02[FIELD_OID_MASK].apply(lambda x: int(x[16:], 16))
-        disp_02.drop(columns=[FIELD_DDID, FIELD_OID_MASK], inplace=True)
-        self._disp = pd.concat([disp_01, disp_02])
-        self._disp.reset_index(drop=True, inplace=True)
-        self._data = self._disp.sort_values(FIELD_MASK).drop_duplicates(FIELD_OID, keep='last').set_index(FIELD_OID).to_dict()[FIELD_MASK]
+        label_01 = keys.copy()
+        label_01[FIELD_OID] = label_01[FIELD_DDID].apply(lambda x: x[1:])
+        label_01.drop(columns=[FIELD_DDID, FIELD_OID_MASK], inplace=True)
+        label_01[FIELD_MASK] = 0
+        label_02 = values.copy()
+        label_02[FIELD_OID] = label_02[FIELD_OID_MASK].apply(lambda x: x[0:16])
+        label_02[FIELD_MASK] = label_02[FIELD_OID_MASK].apply(lambda x: int(x[16:], 16))
+        label_02.drop(columns=[FIELD_DDID, FIELD_OID_MASK], inplace=True)
+        self._labels = pd.concat([label_01, label_02])
+        self._labels.reset_index(drop=True, inplace=True)
+        self._data = self._labels.sort_values(FIELD_MASK).drop_duplicates(FIELD_OID, keep='last').set_index(FIELD_OID).to_dict()[FIELD_MASK]
+
+    def exists(self, desc: str, mask: int = 0):
+        oid = self.oid(desc)
+        if oid is None:
+            return False
+        else:
+            res = self.desc(oid, mask)
+            if BLANK == res:
+                return False
+            else:
+                if res == desc:
+                    return True
+                else:
+                    return False
+
+    def exists_oid(self, oid: str):
+        return oid in self._data
 
     def desc(self, oid: str, mask: int = 0):
-        res = self._disp[(self._disp[FIELD_OID] == oid) & (self._disp[FIELD_MASK] == mask)][FIELD_DESC].tolist()
+        res = self._labels[(self._labels[FIELD_OID] == oid) & (self._labels[FIELD_MASK] == mask)][FIELD_DESC].tolist()
         if 1 == len(res):
             return res[0]
         else:
             return BLANK
+
+    def oid(self, desc: str):
+        res = self._labels[(self._labels[FIELD_DESC] == desc)].drop_duplicates(FIELD_OID, keep='last')[FIELD_OID].tolist()
+        if 1 == len(res):
+            return res[0]
+        else:
+            return None
 
     @abstractmethod
     def init_key_and_value(self):
@@ -233,110 +269,106 @@ class Tags(DataFragments):
         self._value_type = DD_TYPE_TAG_VALUE
 
 
+class TimeDataUnit(DataUnit):
 
-# class TimeDataUnit(DataUnit):
-#
-#     def __init__(self, ddid):
-#         self._ddid = DataDictionaryId(ddid=ddid)
-#         super().__init__(self._ddid.sid)
-#         if self._db.exist_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id)):
-#             self._metric = self._db.get_fields(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id))
-#             self._metric.remove(FIELD_TIMESTAMP)
-#         else:
-#             self._metric = DataDictionary.query_oid(service_id, DD_TYPE_METRIC)
-#             tdu_fields = self.fields()
-#             self._db.init_table(DBHandler.get_table_name(service_id, TABLE_TYPE_TDU, owner_id), tdu_fields)
-#         self._desc = {}
-#         data = DataDictionary.query_dd(service_id, DD_TYPE_METRIC)
-#         for index, row in data.iterrows():
-#             # logger.log(row)
-#             self._desc[row[FIELD_DESC]] = row[KEY_DDID][1:]
-#
-#     def _set_table_name(self):
-#         self._table_name = '_'.join([TABLE_PREFIX_TDU, self.sid, self.oid])
-#
-#     @property
-#     def oid(self):
-#         return self._ddid.oid
-#
-#     def fields(self):
-#         fields = {FIELD_TIMESTAMP: 'VARCHAR(16) PRIMARY KEY'}  # String of Unix Millisecond Timestamp
-#         for metric in self._metric:
-#             fields[metric] = 'INT'
-#         return fields
-#
-#     def query(self, **kwargs):
-#         # 参数校验
-#         if PV_TDU_QUERY.validates(kwargs):
-#             fields = None
-#             res = None
-#             if (KEY_METRIC in kwargs) and (len(kwargs[KEY_METRIC]) > 0):
-#                 fields = kwargs[KEY_METRIC].copy()
-#                 fields.append(FIELD_TIMESTAMP)
-#             condition = None
-#             if 'interval' in kwargs:
-#                 c = FIELD_TIMESTAMP + " >= '{0}' AND " + FIELD_TIMESTAMP + " <= '{1}'"
-#                 date_from = moment(kwargs['interval']['from']).format(MOMENT_FORMAT)
-#                 date_to = moment(kwargs['interval']['to']).format(MOMENT_FORMAT)
-#                 condition = c.format(*[date_from, date_to])
-#             else:
-#                 if 'any' in kwargs:
-#                     claus = []
-#                     c = FIELD_TIMESTAMP + " = '{0}'"
-#                     for item in kwargs['any']:
-#                         claus.append(c.format(*[moment(item).format(MOMENT_FORMAT)]))
-#                     condition = ' OR '.join(claus)
-#             try:
-#                 res = self._db.query(self._service_id, TABLE_TYPE_TDU, fields, condition, self.oid)
-#             except (DatabaseError, RuntimeError):
-#                 logger.error([2003])
-#                 res = pd.DataFrame(columns=self.fields().keys())
-#             finally:
-#                 res[FIELD_TIMESTAMP] = TimeDataUnit.to_date(res[FIELD_TIMESTAMP])
-#                 res.index = res[FIELD_TIMESTAMP]
-#                 del res[FIELD_TIMESTAMP]
-#                 return res
-#         else:
-#             raise ValueError(logger.error([2000]))
-#
-#     @staticmethod
-#     def to_date(data):
-#         return pd.to_datetime(data, unit='s') + DBHandler().tz()
-#
-#     def add(self, **kwargs):
-#         if len(kwargs) > 0 and PV_TDU_ADD.validates(kwargs):
-#             data = {}
-#             tdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_TDU, self.oid)
-#             for key, value in kwargs['data'].items():
-#                 if key in self._desc:
-#                     data[self._desc[key]] = value
-#                 else:
-#                     ddid = DataDictionary.append(service_id=self.service_id, dd_type=DD_TYPE_METRIC, desc=key, oid_mask='')
-#                     metric_id = ddid[1:]
-#                     self._db.add_column(tdu_table_name, metric_id, 'INT')
-#                     self._desc[key] = metric_id
-#                     self._metric.append(metric_id)
-#                     data[metric_id] = value
-#             data[FIELD_TIMESTAMP] = moment(kwargs['ts']).format('X.SSS')
-#             tdu_table_name = DBHandler.get_table_name(self.service_id, TABLE_TYPE_TDU, self.oid)
-#             self._db.add(data, tdu_table_name)
-#         else:
-#             raise ValueError(logger.warning([2001]))
-#
-#     def remove(self, **kwargs):
-#         # TODO 待实现
-#         pass
-#
-#     def sync_db(self, filename, init_flag=False):
-#         table_name = DBHandler.get_table_name(self._service_id, TABLE_TYPE_TDU, self.oid)
-#         if init_flag:
-#             tdu_fields = self.fields()
-#             self._db.init_table(table_name, tdu_fields)
-#         self._db.import_data(filename, table_name)
-#
-#     def import_data(self, filename, data_dict=None):
-#         # TODO 待实现
-#         pass
-#
-#     def export_data(self, output_dir):
-#         self._db.export_data(output_dir, self.service_id, TABLE_TYPE_TDU, self.oid)
+    _metrics = {}
+
+    def __init__(self, ddid):
+        ddid_obj = DataDictionaryId(ddid=ddid)
+        if ddid_obj.dd_type == DD_TYPE_OWNER:
+            self._ddid = ddid_obj
+            TimeDataUnit.add_metrics(ddid_obj.sid)
+            super().__init__(self._ddid.sid)
+        else:
+            raise ValueError(logger.warning([2000]))
+
+    def _set_table_name(self):
+        self._table_name = '_'.join([TABLE_PREFIX_TDU, self.sid, self.oid])
+
+    @property
+    def oid(self):
+        return self._ddid.oid
+
+    def fields(self):
+        fields = {FIELD_TIMESTAMP: 'VARCHAR(16) PRIMARY KEY'}  # String of Unix Millisecond Timestamp
+        for metric in self.metrics.value:
+            fields[metric] = 'INT'
+        return fields
+
+    @property
+    def metrics(self):
+        return TimeDataUnit._metrics[self.sid]
+
+    @classmethod
+    def add_metrics(cls, service_id: str):
+        cls._metrics[service_id] = Metrics(service_id)
+
+    def reset_metrics(self, force: bool = False):
+        if force:
+            TimeDataUnit._metrics[self.sid] = Metrics(self.sid)
+        else:
+            if self.sid in TimeDataUnit._metrics:
+                pass
+            else:
+                TimeDataUnit._metrics[self.sid] = Metrics(self.sid)
+
+    def map_desc(self, oid: str, mask: int = 0):
+        return TimeDataUnit._metrics[self.sid].desc(oid, mask)
+
+    def map_oid(self, desc: str):
+        return TimeDataUnit._metrics[self.sid].oid(desc)
+
+    def _after_sync(self):
+        self.reset_metrics()
+
+    def query(self, **kwargs):
+        fields = [FIELD_TIMESTAMP]
+        if (KEY_METRIC in kwargs) and PV_TDU_QUERY.validate(KEY_METRIC, kwargs[KEY_METRIC]):
+            for oid in kwargs[KEY_METRIC]:
+                if self.metrics.exists_oid(oid):
+                    fields.append(oid)
+        if (KEY_DESC in kwargs) and PV_TDU_QUERY.validate(KEY_DESC, kwargs[KEY_DESC]):
+            for desc in kwargs[KEY_DESC]:
+                oid = self.map_oid(desc)
+                if oid is not None:
+                    fields.append(oid)
+        condition = None
+        if (KEY_INTERVAL in kwargs) and PV_TDU_QUERY.validate(KEY_INTERVAL, kwargs[KEY_INTERVAL]):
+            c = FIELD_TIMESTAMP + " >= '{0}' AND " + FIELD_TIMESTAMP + " <= '{1}'"
+            date_from = moment(kwargs[KEY_INTERVAL][KEY_FROM]).format(MOMENT_FORMAT)
+            date_to = moment(kwargs[KEY_INTERVAL][KEY_TO]).format(MOMENT_FORMAT)
+            condition = c.format(*[date_from, date_to])
+        else:
+            if (KEY_ANY in kwargs) and PV_TDU_QUERY.validate(KEY_ANY, kwargs[KEY_ANY]):
+                claus = []
+                c = FIELD_TIMESTAMP + " = '{0}'"
+                for item in kwargs[KEY_ANY]:
+                    claus.append(c.format(*[moment(item).format(MOMENT_FORMAT)]))
+                condition = ' OR '.join(claus)
+        if 1 == len(fields):
+            fields = None
+        res = self._db.query(self._table_name, fields, condition)
+        res[FIELD_TIMESTAMP] = pd.to_datetime(res[FIELD_TIMESTAMP], unit='s') + self._db.timezone
+        res.set_index(FIELD_TIMESTAMP)
+        return res
+
+    def add(self, **kwargs):
+        if (len(kwargs) > 0) and PV_TDU_ADD.validates(kwargs):
+            data = {}
+            dd = DataDictionary(self.sid)
+            for key, value in kwargs['data'].items():
+                if self.metrics.exists(key):
+                    data[self.metrics.oid(key)] = value
+                else:
+                    ddid = dd.add(dd_type=DD_TYPE_METRIC, desc=key)
+                    oid = ddid[1:]
+                    self._db.add_column(self._table_name, oid, 'INT')
+                    self.reset_metrics(True)
+                    data[oid] = value
+            data[FIELD_TIMESTAMP] = moment(kwargs[KEY_TS]).format(MOMENT_FORMAT)
+            self._db.add(data, self._table_name)
+        else:
+            raise ValueError(logger.warning([2001]))
+
+    def remove(self, ts: str):
+        self._db.remove(self._table_name, FIELD_TIMESTAMP + '="' + ts + '"')

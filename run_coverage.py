@@ -34,6 +34,7 @@ test_modules = [
     'mts.test.core.datamodel.test_DataDictionary',
     'mts.test.core.datamodel.test_Metrics',
     'mts.test.core.datamodel.test_Tags',
+    'mts.test.core.datamodel.test_TimeDataUnit',
     # 'mts.test.test_DataUnitService',
     # 'mts.test.test_DataDictionary',
     # 'mts.test.test_SpaceDataUnit',

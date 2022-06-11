@@ -34,6 +34,24 @@ class TestMetrics(unittest.TestCase):
         with self.assertRaises(ValueError):
             Metrics(12)
 
+    def test_oid(self):
+        service_id = '51'
+        m = Metrics(service_id)
+        self.assertEqual(m.oid('进货量/斤'), 'a4059507fd30c003')
+        self.assertEqual(m.oid('存量/斤'), None)
+
+    def test_exists(self):
+        service_id = '51'
+        m = Metrics(service_id)
+        self.assertTrue(m.exists('进货量/斤'))
+        self.assertFalse(m.exists('存量/斤'))
+
+    def test_exists_oid(self):
+        service_id = '51'
+        m = Metrics(service_id)
+        self.assertTrue(m.exists_oid('a4059507fd30c003'))
+        self.assertFalse(m.exists_oid('a4059507fd30c010'))
+
 
 if __name__ == '__main__':
     unittest.main()  # pragma: no cover

@@ -49,7 +49,7 @@ FIELD_OWNER = 'owner'
 FIELD_OID = 'oid'
 FIELD_MASK = 'mask'
 
-DD_HEADERS = FIELD_DDID + ',' + FIELD_DESC + ',' + FIELD_OID_MASK
+# DD_HEADERS = FIELD_DDID + ',' + FIELD_DESC + ',' + FIELD_OID_MASK
 
 TABLE_PREFIX_DD = 'dd'
 TABLE_PREFIX_SDU = 'sdu'
@@ -69,6 +69,13 @@ KEY_SERVICE_ID = 'service_id'
 KEY_SERVICE_CODE = 'service_code'
 KEY_DD_TYPE = 'dd_type'
 KEY_METRIC = 'metric'
+KEY_OID_MASK = 'oid_mask'
+KEY_INTERVAL = 'interval'
+KEY_ANY = 'any'
+KEY_FROM = 'from'
+KEY_TO = 'to'
+KEY_TS = 'ts'
+KEY_MASK = 'mask'
 
 OID_LEN = 16
 DDID_LEN = 17
@@ -88,18 +95,26 @@ DESC = {
     'maxLength': 160
 }
 
+MASK = {
+    'type': 'string',
+    'pattern': '^[a-f0-9]{16}'
+}
+
 DD_TYPE = {
     'type': 'string',
     'pattern': '^[0-9a-f]{1}'
 }
 
 PV_ID = ParameterValidator({
-    'oid': OID,
-    'ddid': DDID
+    KEY_OID: OID,
+    KEY_DDID: DDID
 })
 
 SERVICE_CODE_MIN = int('101000', 2)
 SERVICE_CODE_MAX = int('111111', 2)
+
+MASK_DEFAULT = '0000000000000000'
+MASK_ENUM = 'ffffffffffffffff'
 
 SERVICE_ID = {
     'type': 'string',
@@ -107,12 +122,12 @@ SERVICE_ID = {
 }
 
 PV_SERVICE = ParameterValidator({
-    'service_code': {
+    KEY_SERVICE_CODE: {
         'type': 'integer',
         'minimum': SERVICE_CODE_MIN,
         'maximum': SERVICE_CODE_MAX
     },
-    'service_id': SERVICE_ID
+    KEY_SERVICE_ID: SERVICE_ID
 })
 
 PV_DB_DEFINITION = ParameterValidator({
@@ -130,18 +145,18 @@ PV_DB_DEFINITION = ParameterValidator({
 })
 
 PV_DD_REMOVE = ParameterValidator({
-    'ddid': DDID
+    KEY_DDID: DDID
 })
 
 PV_DD_QUERY = ParameterValidator({
-    'dd_type': DD_TYPE,
-    'desc': {
+    KEY_DD_TYPE: DD_TYPE,
+    KEY_DESC: {
         'type': 'array',
         'items': DESC,
         'minItems': 1
     },
-    'oid': OID,
-    'ddid': {
+    KEY_OID: OID,
+    KEY_DDID: {
         'type': 'array',
         'items': DDID,
         'minItems': 1
@@ -149,30 +164,45 @@ PV_DD_QUERY = ParameterValidator({
 })
 
 PV_DD_ADD = ParameterValidator({
-    'dd_type': DD_TYPE,
-    'desc': DESC,
-    'oid_mask': {
-        'type': 'string',
-        'pattern': '[a-f0-9]{0,32}'
-    }
+    KEY_DD_TYPE: DD_TYPE,
+    KEY_DESC: DESC,
+    KEY_OID: OID,
+    KEY_MASK: MASK
 })
 
 PV_TDU_QUERY = ParameterValidator({
-    'metric': {
+    KEY_METRIC: {
         'type': 'array',
-        'items': OID
+        'items': OID,
+        'minItems': 1
     },
-    'interval': {
+    KEY_DESC: {
+        'type': 'array',
+        'items': DESC,
+        'minItems': 1
+    },
+    KEY_INTERVAL: {
         'type': 'object',
         'properties': {
-            'from': {'type': 'string'},
-            'to': {'type': 'string'}
+            KEY_FROM: {'type': 'string'},
+            KEY_TO: {'type': 'string'}
             }
     },
-    'any': {
+    KEY_ANY: {
         'type': 'array',
         'items': {'type': 'string'},
         'minItems': 1
+    }
+})
+
+PV_TDU_ADD = ParameterValidator({
+    KEY_TS: {'type': 'string'},
+    'data': {
+        'type': 'object',
+        'propertyNames': {'type': 'string'},
+        'patternProperties': {
+            '': {'type': 'number'}
+        }
     }
 })
 
@@ -207,17 +237,6 @@ PV_SDU_QUERY = ParameterValidator({
                 'type': 'array',
                 'items': OID
             }
-        }
-    }
-})
-
-PV_TDU_ADD = ParameterValidator({
-    'ts': {'type': 'string'},
-    'data': {
-        'type': 'object',
-        'propertyNames': {'type': 'string'},
-        'patternProperties': {
-            '': {'type': 'number'}
         }
     }
 })

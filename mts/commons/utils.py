@@ -34,10 +34,11 @@ def hex_str(num, bits):
 ERROR_DEF = {
     '1000': '[{0}] 不存在数据单元服务：[{1}]，未能进行初始化处理。',
     '1001': '[{0}] 参数ds的类型应为DataService或dict，而非{1}。',
-    '2000': '[{0}] 调用TimeDataUnit的query方法，其参数不符合规范。',
+    # '2000': '[{0}] 调用TimeDataUnit的query方法，其参数不符合规范。',
+    '2000': '[{0}] 构建TimeDataUnit失败，ddid值异常（非owner）。',
     '2001': '[{0}] 调用TimeDataUnit的add方法，其参数不符合规范。',
     # '2002': '[{0}] 构建TimeDataUnit失败，owner_id值异常。',
-    '2003': '[{0}] TimeDataUnit对应的数据库表或相关字段不存在，或者DB异常，导致query失败。',
+    # '2003': '[{0}] TimeDataUnit对应的数据库表或相关字段不存在，或者DB异常，导致query失败。',
     '2500': '[{0}] 待导入文件{1}内容不符合SDU数据规则要求，请检查后重新执行导入操作',
     '2501': '[{0}] 调用SpaceDataUnit的add方法，其参数不符合规范。',
     '4500': '[{0}] 构建DataUnit失败，service_id值异常。',

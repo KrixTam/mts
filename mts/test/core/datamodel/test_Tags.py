@@ -35,6 +35,14 @@ class TestTags(unittest.TestCase):
         with self.assertRaises(ValueError):
             Tags(12)
 
+    def test_exists(self):
+        service_id = '51'
+        t = Tags(service_id)
+        self.assertFalse(t.exists('红'))
+        self.assertFalse(t.exists('黑'))
+        self.assertFalse(t.exists('红', 2))
+        self.assertFalse(t.exists('红', 8))
+
 
 if __name__ == '__main__':
     unittest.main()  # pragma: no cover

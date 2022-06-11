@@ -28,7 +28,6 @@ class TestDataDictionary(unittest.TestCase):
         self.assertEqual(dd.query(True, dd_type=DD_TYPE_METRIC), dd.query(True, desc=['进货量/斤', '销量/斤']))
         self.assertEqual(dd.query(ddid=['1a4059507fd2fc000'])[KEY_DESC].tolist(), ['苹果'])
         self.assertEqual(dd.query(oid='a4059507fd30c001')[KEY_DESC].tolist(), ['山竹'])
-        # self.assertEqual(dd.get_oid(DD_TYPE_METRIC), dd.query(True, desc=['进货量/斤', '销量/斤']))
         dd.export_data(output_dir)
         file_01 = os.path.join(cwd, 'resources', 'ds', '51.dd')
         file_02 = os.path.join(output_dir, 'dd_51.csv')
@@ -42,7 +41,7 @@ class TestDataDictionary(unittest.TestCase):
 
     def test_error_init(self):
         with self.assertRaises(ValueError):
-            dd = DataDictionary(123)
+            DataDictionary(123)
 
     def test_error_query_01(self):
         service_id = '52'
@@ -79,7 +78,7 @@ class TestDataDictionary(unittest.TestCase):
         dd = DataDictionary(service_id)
         dd_file_name = os.path.join(cwd, 'resources', 'ds', '51.dd')
         dd.sync_db(dd_file_name, True)
-        ddid = dd.add(dd_type=DD_TYPE_OWNER, desc='苹果', oid_mask='')
+        ddid = dd.add(dd_type=DD_TYPE_OWNER, desc='苹果')
         self.assertEqual(1, len(dd.query(True, desc=['苹果'])))
         self.assertEqual(ddid[1:], dd.map_oid(desc='苹果'))
         self.assertEqual('苹果', dd.map_desc(ddid[1:]))
@@ -89,7 +88,7 @@ class TestDataDictionary(unittest.TestCase):
     def test_add_and_remove_02(self):
         service_id = '56'
         dd = DataDictionary(service_id)
-        ddid = dd.add(dd_type=DD_TYPE_OWNER, desc='苹果', oid_mask='')
+        ddid = dd.add(dd_type=DD_TYPE_OWNER, desc='苹果')
         self.assertEqual(1, len(dd.query(True, desc=['苹果'])))
         self.assertEqual(ddid[1:], dd.map_oid(desc='苹果'))
         self.assertEqual('苹果', dd.map_desc(ddid[1:]))
@@ -101,6 +100,20 @@ class TestDataDictionary(unittest.TestCase):
         dd = DataDictionary(service_id)
         with self.assertRaises(ValueError):
             dd.add()
+
+    def test_add_04(self):
+        service_id = '56'
+        dd = DataDictionary(service_id)
+        with self.assertRaises(ValueError):
+            dd.add(dd_type=DD_TYPE_OWNER)
+
+    def test_add_05(self):
+        service_id = '56'
+        dd = DataDictionary(service_id)
+        ddid = dd.add(dd_type=DD_TYPE_TAG_VALUE, desc='黑', oid='a4059507fd30c005', mask='0000000000000007')
+        self.assertEqual(1, len(dd.query(True, desc=['黑'])))
+        self.assertEqual(ddid[1:], dd.map_oid(desc='黑'))
+        self.assertEqual('黑', dd.map_desc(ddid[1:]))
 
     def test_field(self):
         service_id = '57'
