@@ -313,10 +313,10 @@ class TimeDataUnit(DataUnit):
                 TimeDataUnit._metrics[self.sid] = Metrics(self.sid)
 
     def map_desc(self, oid: str, mask: int = 0):
-        return TimeDataUnit._metrics[self.sid].desc(oid, mask)
+        return self.metrics.desc(oid, mask)
 
     def map_oid(self, desc: str):
-        return TimeDataUnit._metrics[self.sid].oid(desc)
+        return self.metrics.oid(desc)
 
     def _after_sync(self):
         self.reset_metrics()
@@ -349,7 +349,8 @@ class TimeDataUnit(DataUnit):
             fields = None
         res = self._db.query(self._table_name, fields, condition)
         res[FIELD_TIMESTAMP] = pd.to_datetime(res[FIELD_TIMESTAMP], unit='s') + self._db.timezone
-        res.set_index(FIELD_TIMESTAMP)
+        res.set_index(FIELD_TIMESTAMP, drop=True, inplace=True)
+        res = res.apply(pd.to_numeric)
         return res
 
     def add(self, **kwargs):
@@ -371,4 +372,5 @@ class TimeDataUnit(DataUnit):
             raise ValueError(logger.warning([2001]))
 
     def remove(self, ts: str):
-        self._db.remove(self._table_name, FIELD_TIMESTAMP + '="' + ts + '"')
+        ts_value = moment(ts).format(MOMENT_FORMAT)
+        self._db.remove(self._table_name, FIELD_TIMESTAMP + '="' + ts_value + '"')
