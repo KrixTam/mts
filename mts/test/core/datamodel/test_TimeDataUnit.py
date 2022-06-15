@@ -90,7 +90,7 @@ class TestTimeDataUnit(unittest.TestCase):
         tdu.sync_db(filename, True)
         df = tdu.query(interval={'from': '2022-1-1', 'to': '2023-1-1'})
         self.assertTrue(df.empty)
-        tdu.add(ts='2022-6-12', data={'进货量/斤': 55, '销量/斤': 38})
+        tdu.add(ts='2022-6-12', data_desc={'进货量/斤': 55, '销量/斤': 38})
         df = tdu.query(interval={'from': '2022-1-1', 'to': '2023-1-1'})
         self.assertEqual(df.shape, (1, 2))
         self.assertEqual(38, df['a4059507fd30c004'][0])
@@ -101,13 +101,31 @@ class TestTimeDataUnit(unittest.TestCase):
         tdu.sync_db(filename, True)
         df = tdu.query(interval={'from': '2022-1-1', 'to': '2023-1-1'})
         self.assertTrue(df.empty)
-        tdu.add(ts='2022-6-12', data={'进货量/斤': 55, '销量/斤': 38, '存量': 188})
+        tdu.add(ts='2022-6-12', data_desc={'进货量/斤': 55, '销量/斤': 38, '存量': 188})
         df = tdu.query(interval={'from': '2022-1-1', 'to': '2023-1-1'})
         self.assertEqual(df.shape, (1, 3))
         metric = tdu.metrics.value
         metric.remove('a4059507fd30c003')
         metric.remove('a4059507fd30c004')
         self.assertEqual(188, df[metric[0]][0])
+
+    def test_add_04(self):
+        tdu = TimeDataUnit('1a4059507fd2fc000')
+        filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
+        tdu.sync_db(filename, True)
+        with self.assertRaises(ValueError):
+            tdu.add(ts='2022-6-12', d={'进货量/斤': 55, '销量/斤': 38, '存量': 188})
+
+    def test_add_05(self):
+        tdu = TimeDataUnit('1a4059507fd2fc000')
+        filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
+        tdu.sync_db(filename, True)
+        df = tdu.query(interval={'from': '2022-1-1', 'to': '2023-1-1'})
+        self.assertTrue(df.empty)
+        tdu.add(ts='2022-6-12', data={'a4059507fd30c003': 55, 'a4059507fd30c004': 38})
+        df = tdu.query(interval={'from': '2022-1-1', 'to': '2023-1-1'})
+        self.assertEqual(df.shape, (1, 2))
+        self.assertEqual(38, df['a4059507fd30c004'][0])
 
     def test_reset_metrics(self):
         tdu = TimeDataUnit('1a4059507fd2fc000')

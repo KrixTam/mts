@@ -9,7 +9,7 @@ class TestDataFileHandler(unittest.TestCase):
 
     def test_checksum(self):
         dd_file_name = os.path.join(cwd, 'resources', 'ds', '51.dd')
-        self.assertEqual(DataFileHandler.checksum(dd_file_name), 'e005c2042a38caaff6514fdb44e8c4b2')
+        self.assertEqual(DataFileHandler.checksum(dd_file_name), 'c4b33d31c5cc4cab7bce6c503ad7b031')
 
     def test_load_json(self):
         file_name = os.path.join(cwd, 'resources', 'ds', 'test.json')

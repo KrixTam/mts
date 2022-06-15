@@ -71,11 +71,16 @@ KEY_DD_TYPE = 'dd_type'
 KEY_METRIC = 'metric'
 KEY_OID_MASK = 'oid_mask'
 KEY_INTERVAL = 'interval'
-KEY_ANY = 'any'
+KEY_ANY = 'any'  # any time in the list
 KEY_FROM = 'from'
 KEY_TO = 'to'
 KEY_TS = 'ts'
 KEY_MASK = 'mask'
+KEY_OWNER = 'owner'
+KEY_TAG = 'tag'
+KEY_DATA = 'data'
+KEY_DATA_DESC = 'data_desc'
+KEY_OP = 'op'
 
 OID_LEN = 16
 DDID_LEN = 17
@@ -197,9 +202,16 @@ PV_TDU_QUERY = ParameterValidator({
 
 PV_TDU_ADD = ParameterValidator({
     KEY_TS: {'type': 'string'},
-    'data': {
+    KEY_DATA_DESC: {
         'type': 'object',
         'propertyNames': {'type': 'string'},
+        'patternProperties': {
+            '': {'type': 'number'}
+        }
+    },
+    KEY_DATA: {
+        'type': 'object',
+        'propertyNames': OID,
         'patternProperties': {
             '': {'type': 'number'}
         }
@@ -207,54 +219,73 @@ PV_TDU_ADD = ParameterValidator({
 })
 
 PV_SDU_QUERY = ParameterValidator({
-    'owner': {
+    KEY_OWNER: {
         'type': 'object',
         'properties': {
-            'filter': {}
-        }
-    },
-    'include': {
-        'type': 'object',
-        'properties': {
-            'owner': {
-                'type': 'array',
-                'items': OID
+            KEY_OP: {
+                'type': 'string',
+                'pattern': '(and)|(or)'
             },
-            'metric': {
+            KEY_DATA: {
                 'type': 'array',
-                'items': OID
+                'items': {
+                    'type': 'object',
+                    'propertyNames': {
+                        'type': 'string',
+                        'pattern': '(eq)|(ne)'
+                    },
+                    'patternProperties': {
+                        '': OID
+                    }
+                },
+                'minItems': 1,
             }
         }
     },
-    'exclude': {
+    KEY_TAG: {
         'type': 'object',
         'properties': {
-            'owner': {
-                'type': 'array',
-                'items': OID
+            KEY_OP: {
+                'type': 'string',
+                'pattern': '(and)|(or)'
             },
-            'metric': {
-                'type': 'array',
-                'items': OID
+            KEY_DATA: {
+                'type': 'object',
+                'properties': {
+                    'propertyNames': OID,
+                    'patternProperties': {
+                        '': {
+                            'type': 'array',
+                            'items': {
+                                'type': 'object',
+                                'propertyNames': {
+                                    'type': 'string',
+                                    'pattern': '(eq)|(ne)'
+                                },
+                                'patternProperties': {
+                                    '': {'type': 'number'}
+                                }
+                            },
+                            'minItems': 1,
+                        }
+                    }
+                },
+                'minProperties': 1
             }
-        }
+        },
+        'minProperties': 1
     }
 })
 
 PV_SDU_ADD = ParameterValidator({
-    'owner': {'type': 'string'},
+    KEY_OWNER: OID,
     'data': {
         'type': 'object',
-        'propertyNames': {'type': 'string'},
+        'propertyNames': OID,
         'patternProperties': {
-            '': {
-                'type': 'array',
-                'items': {
-                    'type': 'string',
-                    'minItems': 1
-                }
-            }
-        }
+            '': {'type': 'number'}
+        },
+        'minProperties': 1
     }
 })
 

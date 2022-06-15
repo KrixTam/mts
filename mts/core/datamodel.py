@@ -273,7 +273,7 @@ class TimeDataUnit(DataUnit):
 
     _metrics = {}
 
-    def __init__(self, ddid):
+    def __init__(self, ddid: str):
         ddid_obj = DataDictionaryId(ddid=ddid)
         if ddid_obj.dd_type == DD_TYPE_OWNER:
             self._ddid = ddid_obj
@@ -354,23 +354,114 @@ class TimeDataUnit(DataUnit):
         return res
 
     def add(self, **kwargs):
-        if (len(kwargs) > 0) and PV_TDU_ADD.validates(kwargs):
+        if (KEY_TS in kwargs) and PV_TDU_ADD.validate(KEY_TS, kwargs[KEY_TS]):
             data = {}
-            dd = DataDictionary(self.sid)
-            for key, value in kwargs['data'].items():
-                if self.metrics.exists(key):
-                    data[self.metrics.oid(key)] = value
+            if (KEY_DATA_DESC in kwargs) and PV_TDU_ADD.validate(KEY_DATA_DESC, kwargs[KEY_DATA_DESC]):
+                dd = DataDictionary(self.sid)
+                for key, value in kwargs[KEY_DATA_DESC].items():
+                    if self.metrics.exists(key):
+                        data[self.metrics.oid(key)] = value
+                    else:
+                        ddid = dd.add(dd_type=DD_TYPE_METRIC, desc=key)
+                        oid = ddid[1:]
+                        self._db.add_column(self._table_name, oid, 'INT')
+                        self.reset_metrics(True)
+                        data[oid] = value
+                data[FIELD_TIMESTAMP] = moment(kwargs[KEY_TS]).format(MOMENT_FORMAT)
+                self._db.add(data, self._table_name)
+            else:
+                if (KEY_DATA in kwargs) and PV_TDU_ADD.validate(KEY_DATA, kwargs[KEY_DATA]):
+                    for key, value in kwargs[KEY_DATA].items():
+                        if self.metrics.exists_oid(key):
+                            data[key] = value
+                    data[FIELD_TIMESTAMP] = moment(kwargs[KEY_TS]).format(MOMENT_FORMAT)
+                    self._db.add(data, self._table_name)
                 else:
-                    ddid = dd.add(dd_type=DD_TYPE_METRIC, desc=key)
-                    oid = ddid[1:]
-                    self._db.add_column(self._table_name, oid, 'INT')
-                    self.reset_metrics(True)
-                    data[oid] = value
-            data[FIELD_TIMESTAMP] = moment(kwargs[KEY_TS]).format(MOMENT_FORMAT)
-            self._db.add(data, self._table_name)
+                    raise ValueError(logger.warning([2001]))
         else:
             raise ValueError(logger.warning([2001]))
 
     def remove(self, ts: str):
         ts_value = moment(ts).format(MOMENT_FORMAT)
         self._db.remove(self._table_name, FIELD_TIMESTAMP + '="' + ts_value + '"')
+
+
+class SpaceDataUnit(DataUnit):
+
+    def __init__(self, service_id: str):
+        self.tags = Tags(service_id)
+        super().__init__(service_id)
+
+    def _set_table_name(self):
+        self._table_name = '_'.join([TABLE_PREFIX_SDU, self.sid])
+
+    def fields(self):
+        fields = {FIELD_OWNER: 'VARCHAR(16) PRIMARY KEY'}
+        for tag in self.tags.value:
+            fields[tag] = 'INT DEFAULT 0'
+        return fields
+
+    def map_desc(self, oid: str):
+        return self.tags.desc(oid)
+
+    def query(self, **kwargs):
+        if (KEY_TAG in kwargs) and PV_SDU_QUERY.validate(KEY_TAG, kwargs[KEY_TAG]):
+            pass
+        else:
+            raise ValueError(logger.error([2500]))
+        condition = BLANK
+        if (KEY_OWNER in kwargs) and PV_SDU_QUERY.validate(KEY_OWNER, kwargs[KEY_OWNER]):
+            owner_condition = []
+            op = ' OR '
+            if 'and' == kwargs[KEY_OWNER][KEY_OP]:
+                op = ' AND '
+            if 'or' == kwargs[KEY_OWNER][KEY_OP]:
+                op = ' OR '
+            for item in kwargs[KEY_OWNER][KEY_DATA]:
+                if 'eq' in item:
+                    owner_condition.append(FIELD_OWNER + '="' + item['eq'] + '"')
+                if 'ne' in item:
+                    owner_condition.append(FIELD_OWNER + '!="' + item['ne'] + '"')
+            condition = condition + op.join(owner_condition)
+        if BLANK == condition:
+            condition = None
+        df = self._db.query(self._table_name, None, condition)
+        if df.empty:
+            return None
+        else:
+            res = pd.DataFrame()
+            res[FIELD_OWNER] = df[FIELD_OWNER]
+            for tag, value in kwargs[KEY_TAG][KEY_DATA].items():
+                for item in value:
+                    if 'eq' in item:
+                        res[tag+'_eq'+str(item['eq'])] = df[tag].apply(lambda x: (x & item['eq']) == item['eq'])
+                    if 'ne' in item:
+                        res[tag+'_ne'+str(item['ne'])] = df[tag].apply(lambda x: not ((x & item['ne']) == item['ne']))
+            res.set_index(FIELD_OWNER, drop=True, inplace=True)
+            r = []
+            if 'and' == kwargs[KEY_TAG][KEY_OP]:
+                r = res.index[res.all(axis=1)].tolist()
+            if 'or' == kwargs[KEY_TAG][KEY_OP]:
+                r = res.index[res.any(axis=1)].tolist()
+            if len(r) > 0:
+                r.sort()
+                return r
+            else:
+                return None
+
+    def add(self, **kwargs):
+        if PV_SDU_ADD.validates(kwargs):
+            data = {KEY_OWNER: kwargs[KEY_OWNER]}
+            for tag in self.tags.value:
+                if tag in kwargs['data']:
+                    data[tag] = kwargs['data'][tag]
+                else:
+                    data[tag] = 0
+            self._db.add(data, self._table_name)
+        else:
+            raise ValueError(logger.error([2501]))
+
+    def remove(self, **kwargs):
+        # TODO 待实现
+        pass
+
