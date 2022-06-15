@@ -141,7 +141,7 @@ class TestTimeDataUnit(unittest.TestCase):
         self.assertTrue(na_flags[2])
         self.assertEqual(180, res['a4059507fd30c004'][1])
 
-    def test_remove(self):
+    def test_remove_01(self):
         tdu = TimeDataUnit('1a4059507fd2fc000')
         filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
         tdu.sync_db(filename, True)
@@ -150,6 +150,25 @@ class TestTimeDataUnit(unittest.TestCase):
         tdu.remove('2021-02-28')
         res = tdu.query(metric=['a4059507fd30c004'])
         self.assertTrue(np.isnan(res['a4059507fd30c004'][1]))
+
+    def test_remove_02(self):
+        tdu = TimeDataUnit('1a4059507fd2fc000')
+        filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
+        tdu.sync_db(filename, True)
+        res = tdu.query(metric=['a4059507fd30c004'])
+        self.assertEqual(180, res['a4059507fd30c004'][1])
+        tdu.remove({'from': '2021-02-26', 'to': '2021-02-28'})
+        res = tdu.query(metric=['a4059507fd30c004'])
+        self.assertTrue(np.isnan(res['a4059507fd30c004'][1]))
+
+    def test_remove_03(self):
+        tdu = TimeDataUnit('1a4059507fd2fc000')
+        filename = os.path.join(cwd, 'resources', 'ds', '51_a4059507fd2fc000.tdu')
+        tdu.sync_db(filename, True)
+        res = tdu.query(metric=['a4059507fd30c004'])
+        self.assertEqual(180, res['a4059507fd30c004'][1])
+        with self.assertRaises(ValueError):
+            tdu.remove(['2021-02-28'])
 
 
 if __name__ == '__main__':

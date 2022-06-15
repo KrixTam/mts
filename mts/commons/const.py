@@ -218,6 +218,16 @@ PV_TDU_ADD = ParameterValidator({
     }
 })
 
+PV_TDU_REMOVE = ParameterValidator({
+    KEY_TS: {
+        'type': 'object',
+        'properties': {
+            KEY_FROM: {'type': 'string'},
+            KEY_TO: {'type': 'string'}
+            }
+    }
+})
+
 PV_SDU_QUERY = ParameterValidator({
     KEY_OWNER: {
         'type': 'object',

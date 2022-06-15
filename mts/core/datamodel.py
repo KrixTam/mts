@@ -388,9 +388,19 @@ class TimeDataUnit(DataUnit):
         else:
             raise ValueError(logger.warning([2001]))
 
-    def remove(self, ts: str):
-        ts_value = moment(ts).format(MOMENT_FORMAT)
-        self._db.remove(self._table_name, FIELD_TIMESTAMP + '="' + ts_value + '"')
+    def remove(self, ts):
+        if isinstance(ts, str):
+            ts_value = moment(ts).format(MOMENT_FORMAT)
+            self._db.remove(self._table_name, FIELD_TIMESTAMP + '="' + ts_value + '"')
+        else:
+            if isinstance(ts, dict) and PV_TDU_REMOVE.validate(KEY_TS, ts):
+                c = FIELD_TIMESTAMP + " >= '{0}' AND " + FIELD_TIMESTAMP + " <= '{1}'"
+                date_from = moment(ts[KEY_FROM]).format(MOMENT_FORMAT)
+                date_to = moment(ts[KEY_TO]).format(MOMENT_FORMAT)
+                condition = c.format(*[date_from, date_to])
+                self._db.remove(self._table_name, condition)
+            else:
+                raise ValueError(logger.warning([2002]))
 
 
 class SpaceDataUnit(DataUnit):
@@ -483,6 +493,7 @@ class SpaceDataUnit(DataUnit):
                 return None
 
     def add(self, **kwargs):
+        # TODO 待实现
         if PV_SDU_ADD.validates(kwargs):
             data = {KEY_OWNER: kwargs[KEY_OWNER]}
             for tag in self.tags.value:

@@ -37,6 +37,7 @@ ERROR_DEF = {
     # '2000': '[{0}] 调用TimeDataUnit的query方法，其参数不符合规范。',
     '2000': '[{0}] 构建TimeDataUnit失败，ddid值异常（非owner）。',
     '2001': '[{0}] 调用TimeDataUnit的add方法，其参数不符合规范。',
+    '2002': '[{0}] 调用TimeDataUnit的remove方法，其参数不符合规范。',
     # '2002': '[{0}] 构建TimeDataUnit失败，owner_id值异常。',
     # '2003': '[{0}] TimeDataUnit对应的数据库表或相关字段不存在，或者DB异常，导致query失败。',
     # '2500': '[{0}] 待导入文件{1}内容不符合SDU数据规则要求，请检查后重新执行导入操作',
