@@ -124,6 +124,36 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual('山竹', dd.map_desc(res[3], DD_TYPE_OWNER))
         self.assertEqual('香蕉', dd.map_desc(res[4], DD_TYPE_OWNER))
 
+    def test_query_07(self):
+        service_id = '51'
+        sdu = SpaceDataUnit(service_id)
+        dd = DataDictionary(service_id)
+        filename = os.path.join(cwd, 'resources', 'ds', '51.sdu')
+        sdu.sync_db(filename, True)
+        res = sdu.query(owner={'op': 'and', 'data_desc': [{'eq': '梨'}]},
+                        tag={'op': 'and', 'data_desc': {'颜色': [{'eq': '红'}, {'ne': '黄'}]}})
+        self.assertEqual(None, res)
+        res = sdu.query(owner={'op': 'or', 'data_desc': [{'eq': '梨'}]},
+                        tag={'op': 'and', 'data_desc': {'颜色': [{'eq': '红'}, {'ne': '黄'}]}})
+        self.assertEqual(None, res)
+        res = sdu.query(owner={'op': 'or', 'data_desc': [{'eq': '苹果'}]},
+                        tag={'op': 'or', 'data_desc': {'颜色': [{'eq': '红'}, {'eq': '黄'}]}})
+        self.assertEqual(1, len(res))
+        self.assertEqual('苹果', dd.map_desc(res[0], DD_TYPE_OWNER))
+        res = sdu.query(owner={'op': 'or', 'data_desc': [{'eq': '苹果'}, {'eq': '西瓜'}]},
+                        tag={'op': 'or', 'data_desc': {'颜色': [{'eq': '绿'}, {'ne': '黄'}]}})
+        self.assertEqual(2, len(res))
+        self.assertEqual('苹果', dd.map_desc(res[0], DD_TYPE_OWNER))
+        self.assertEqual('西瓜', dd.map_desc(res[1], DD_TYPE_OWNER))
+        res = sdu.query(owner={'op': 'and', 'data_desc': [{'ne': '苹果'}, {'ne': '西瓜'}]},
+                        tag={'op': 'or', 'data_desc': {'颜色': [{'eq': '绿'}, {'ne': '黄'}]}})
+        self.assertEqual(5, len(res))
+        self.assertEqual('梨', dd.map_desc(res[0], DD_TYPE_OWNER))
+        self.assertEqual('橘子', dd.map_desc(res[1], DD_TYPE_OWNER))
+        self.assertEqual('橙子', dd.map_desc(res[2], DD_TYPE_OWNER))
+        self.assertEqual('山竹', dd.map_desc(res[3], DD_TYPE_OWNER))
+        self.assertEqual('香蕉', dd.map_desc(res[4], DD_TYPE_OWNER))
+
 
 if __name__ == '__main__':
     unittest.main()  # pragma: no cover

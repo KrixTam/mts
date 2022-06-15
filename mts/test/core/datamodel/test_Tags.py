@@ -41,7 +41,13 @@ class TestTags(unittest.TestCase):
         self.assertFalse(t.exists('红'))
         self.assertFalse(t.exists('黑'))
         self.assertFalse(t.exists('红', 2))
-        self.assertFalse(t.exists('红', 8))
+        self.assertFalse(t.exists('红', 64))
+
+    def test_enum_value(self):
+        service_id = '51'
+        t = Tags(service_id)
+        self.assertEqual(4, t.enum_value('绿'))
+        self.assertEqual(None, t.enum_value('黑'))
 
 
 if __name__ == '__main__':

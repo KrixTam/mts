@@ -239,6 +239,20 @@ PV_SDU_QUERY = ParameterValidator({
                     }
                 },
                 'minItems': 1,
+            },
+            KEY_DATA_DESC: {
+                'type': 'array',
+                'items': {
+                    'type': 'object',
+                    'propertyNames': {
+                        'type': 'string',
+                        'pattern': '(eq)|(ne)'
+                    },
+                    'patternProperties': {
+                        '': {'type': 'string'}
+                    }
+                },
+                'minItems': 1,
             }
         }
     },
@@ -264,6 +278,29 @@ PV_SDU_QUERY = ParameterValidator({
                                 },
                                 'patternProperties': {
                                     '': {'type': 'number'}
+                                }
+                            },
+                            'minItems': 1,
+                        }
+                    }
+                },
+                'minProperties': 1
+            },
+            KEY_DATA_DESC: {
+                'type': 'object',
+                'properties': {
+                    'propertyNames': {'type': 'string'},
+                    'patternProperties': {
+                        '': {
+                            'type': 'array',
+                            'items': {
+                                'type': 'object',
+                                'propertyNames': {
+                                    'type': 'string',
+                                    'pattern': '(eq)|(ne)'
+                                },
+                                'patternProperties': {
+                                    '': {'type': 'string'}
                                 }
                             },
                             'minItems': 1,
