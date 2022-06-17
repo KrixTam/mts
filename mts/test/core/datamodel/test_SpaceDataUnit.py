@@ -264,10 +264,16 @@ class MyTestCase(unittest.TestCase):
         dd = DataDictionary(service_id)
         res = sdu.query(tag={'op': 'and', 'data': {'a4059507fd30c005': [{'eq': 1}]}})
         self.assertEqual(None, res)
-        sdu.add(owner='a4059507fd2fc002', data_desc={'颜色': '红'})
+        sdu.add(owner='西瓜', data_desc={'颜色': '红'})
         res = sdu.query(tag={'op': 'and', 'data': {'a4059507fd30c005': [{'eq': 1}]}})
         self.assertEqual(1, len(res))
         self.assertEqual('西瓜', dd.map_desc(res[0], DD_TYPE_OWNER))
+
+    def test_add_06(self):
+        service_id = '51'
+        sdu = SpaceDataUnit(service_id)
+        with self.assertRaises(ValueError):
+            sdu.add(owner='菠萝', data_desc={'颜色': '红'})
 
 
 if __name__ == '__main__':

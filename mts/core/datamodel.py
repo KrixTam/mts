@@ -550,22 +550,27 @@ class SpaceDataUnit(DataUnit):
 
     def add(self, **kwargs):
         if (KEY_OWNER in kwargs) and PV_SDU_ADD.validate(KEY_OWNER, kwargs[KEY_OWNER]):
-            res = self.query(oid_only=False, owner={'op': 'and', 'data': [{'eq': kwargs[KEY_OWNER]}]})
+            dd = DataDictionary(self.sid)
+            if PV_ID.validate(KEY_OID, kwargs[KEY_OWNER]):
+                if dd.map_desc(kwargs[KEY_OWNER], DD_TYPE_OWNER) is None:
+                    raise ValueError(logger.error([2502, kwargs[KEY_OWNER]]))
+                else:
+                    owner = kwargs[KEY_OWNER]
+            else:
+                owner = dd.map_oid(kwargs[KEY_OWNER], DD_TYPE_OWNER)
+            if owner is None:
+                raise ValueError(logger.error([2502, kwargs[KEY_OWNER]]))
+            res = self.query(oid_only=False, owner={'op': 'and', 'data': [{'eq': owner}]})
             if (res is not None) and (res.shape[0] == 1):
                 data = self._add_pre(res.to_dict('records')[0], **kwargs)
-                self._db.remove(self._table_name, FIELD_OWNER + '="' + kwargs[KEY_OWNER] + '"')
+                self._db.remove(self._table_name, FIELD_OWNER + '="' + owner + '"')
                 self._db.add(data, self._table_name)
             else:
-                dd = DataDictionary(self.sid)
-                tmp = dd.query(oid_only=True, oid=kwargs[KEY_OWNER], dd_type=DD_TYPE_OWNER)
-                if len(tmp) == 1:
-                    data = {FIELD_OWNER: kwargs[KEY_OWNER]}
-                    for tag in self.tags.value:
-                        data[tag] = 0
-                    data = self._add_pre(data, **kwargs)
-                    self._db.add(data, self._table_name)
-                else:
-                    raise ValueError(logger.error([2502, kwargs[KEY_OWNER]]))
+                data = {FIELD_OWNER: owner}
+                for tag in self.tags.value:
+                    data[tag] = 0
+                data = self._add_pre(data, **kwargs)
+                self._db.add(data, self._table_name)
         else:
             raise ValueError(logger.error([2501]))
 

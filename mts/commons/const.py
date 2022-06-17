@@ -325,7 +325,7 @@ PV_SDU_QUERY = ParameterValidator({
 })
 
 PV_SDU_ADD = ParameterValidator({
-    KEY_OWNER: OID,
+    KEY_OWNER: {'type': 'string'},
     KEY_DATA: {
         'type': 'object',
         'propertyNames': OID,
@@ -374,30 +374,3 @@ PV_TZ = ParameterValidator({
 })
 
 EMPTY = DataFrame.empty
-
-PV_SDU_DATA = ParameterValidator({
-    'tag': {
-        'type': 'array',
-        'items': {
-            'type': 'object',
-            'properties': {
-                'name': {'type': 'string'},
-                'values': {
-                    'type': 'array',
-                    'items': {
-                        'type': 'object',
-                        'properties': {
-                            'desc': {'type': 'string'},
-                            'owners': {
-                                'type': 'array',
-                                'items': {'type': 'string'}
-                            }
-                        }
-                    },
-                    'minItems': 1
-                }
-            }
-        },
-        'minItems': 1
-    }
-})
