@@ -224,7 +224,7 @@ PV_TDU_REMOVE = ParameterValidator({
         'properties': {
             KEY_FROM: {'type': 'string'},
             KEY_TO: {'type': 'string'}
-            }
+        }
     }
 })
 
@@ -326,11 +326,39 @@ PV_SDU_QUERY = ParameterValidator({
 
 PV_SDU_ADD = ParameterValidator({
     KEY_OWNER: OID,
-    'data': {
+    KEY_DATA: {
         'type': 'object',
         'propertyNames': OID,
         'patternProperties': {
             '': {'type': 'number'}
+        },
+        'minProperties': 1
+    },
+    KEY_DATA_DESC: {
+        'type': 'object',
+        'propertyNames': {'type': 'string'},
+        'patternProperties': {
+            '': {'type': 'string'}
+        },
+        'minProperties': 1
+    }
+})
+
+PV_SDU_REMOVE = ParameterValidator({
+    KEY_OWNER: OID,
+    KEY_DATA: {
+        'type': 'object',
+        'propertyNames': OID,
+        'patternProperties': {
+            '': {'type': 'number'}
+        },
+        'minProperties': 1
+    },
+    KEY_DATA_DESC: {
+        'type': 'object',
+        'propertyNames': {'type': 'string'},
+        'patternProperties': {
+            '': {'type': 'string'}
         },
         'minProperties': 1
     }

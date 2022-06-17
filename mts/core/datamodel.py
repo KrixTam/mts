@@ -421,87 +421,151 @@ class SpaceDataUnit(DataUnit):
     def map_desc(self, oid: str):
         return self.tags.desc(oid)
 
-    def query(self, **kwargs):
-        if (KEY_TAG in kwargs) and PV_SDU_QUERY.validate(KEY_TAG, kwargs[KEY_TAG]):
-            pass
-        else:
-            raise ValueError(logger.error([2500]))
+    def init_data(self):
+        dd = DataDictionary(self.sid)
+        tags = {}
+        for tag in self.tags.value:
+            tags[tag] = 0
+        for owner in dd.query(True, dd_type=DD_TYPE_OWNER):
+            data = tags.copy()
+            data[FIELD_OWNER] = owner
+            self._db.add(data, self._table_name)
+
+    def _query_condition_for_owner(self, **kwargs):
         condition = BLANK
         dd = DataDictionary(self.sid)
-        if (KEY_OWNER in kwargs) and PV_SDU_QUERY.validate(KEY_OWNER, kwargs[KEY_OWNER]):
-            owner_condition = []
+        owner_condition = []
+        op = ' OR '
+        if 'and' == kwargs[KEY_OWNER][KEY_OP]:
+            op = ' AND '
+        if 'or' == kwargs[KEY_OWNER][KEY_OP]:
             op = ' OR '
-            if 'and' == kwargs[KEY_OWNER][KEY_OP]:
-                op = ' AND '
-            if 'or' == kwargs[KEY_OWNER][KEY_OP]:
-                op = ' OR '
-            if KEY_DATA in kwargs[KEY_OWNER]:
-                for item in kwargs[KEY_OWNER][KEY_DATA]:
-                    if 'eq' in item:
-                        owner_condition.append(FIELD_OWNER + '="' + item['eq'] + '"')
-                    if 'ne' in item:
-                        owner_condition.append(FIELD_OWNER + '!="' + item['ne'] + '"')
-            if KEY_DATA_DESC in kwargs[KEY_OWNER]:
-                for item in kwargs[KEY_OWNER][KEY_DATA_DESC]:
-                    if 'eq' in item:
-                        v = dd.map_oid(item['eq'], DD_TYPE_OWNER)
-                        if v is not None:
-                            owner_condition.append(FIELD_OWNER + '="' + v + '"')
-                    if 'ne' in item:
-                        v = dd.map_oid(item['ne'], DD_TYPE_OWNER)
-                        if v is not None:
-                            owner_condition.append(FIELD_OWNER + '!="' + v + '"')
-            condition = condition + op.join(owner_condition)
-        if BLANK == condition:
-            condition = None
-        df = self._db.query(self._table_name, None, condition)
-        if df.empty:
-            return None
-        else:
-            res = pd.DataFrame()
-            res[FIELD_OWNER] = df[FIELD_OWNER]
-            if KEY_DATA in kwargs[KEY_TAG]:
-                for tag, value in kwargs[KEY_TAG][KEY_DATA].items():
-                    for item in value:
-                        if 'eq' in item:
-                            res[tag+'_eq'+str(item['eq'])] = df[tag].apply(lambda x: (x & item['eq']) == item['eq'])
-                        if 'ne' in item:
-                            res[tag+'_ne'+str(item['ne'])] = df[tag].apply(lambda x: not ((x & item['ne']) == item['ne']))
-            if KEY_DATA_DESC in kwargs[KEY_TAG]:
-                for tag, value in kwargs[KEY_TAG][KEY_DATA_DESC].items():
-                    tag_id = self.tags.oid(tag)
-                    if tag_id is not None:
-                        for item in value:
-                            if 'eq' in item:
-                                tag_value = self.tags.enum_value(item['eq'])
-                                if tag_value is not None:
-                                    res[tag+'_eq'+item['eq']] = df[tag_id].apply(lambda x: (x & tag_value) == tag_value)
-                            if 'ne' in item:
-                                tag_value = self.tags.enum_value(item['ne'])
-                                if tag_value is not None:
-                                    res[tag+'_ne'+item['ne']] = df[tag_id].apply(lambda x: not ((x & tag_value) == tag_value))
-            res.set_index(FIELD_OWNER, drop=True, inplace=True)
-            r = []
-            if 'and' == kwargs[KEY_TAG][KEY_OP]:
-                r = res.index[res.all(axis=1)].tolist()
-            if 'or' == kwargs[KEY_TAG][KEY_OP]:
-                r = res.index[res.any(axis=1)].tolist()
-            if len(r) > 0:
-                r.sort()
-                return r
-            else:
+        if KEY_DATA in kwargs[KEY_OWNER]:
+            for item in kwargs[KEY_OWNER][KEY_DATA]:
+                if 'eq' in item:
+                    owner_condition.append(FIELD_OWNER + '="' + item['eq'] + '"')
+                if 'ne' in item:
+                    owner_condition.append(FIELD_OWNER + '!="' + item['ne'] + '"')
+        if KEY_DATA_DESC in kwargs[KEY_OWNER]:
+            for item in kwargs[KEY_OWNER][KEY_DATA_DESC]:
+                if 'eq' in item:
+                    v = dd.map_oid(item['eq'], DD_TYPE_OWNER)
+                    if v is not None:
+                        owner_condition.append(FIELD_OWNER + '="' + v + '"')
+                if 'ne' in item:
+                    v = dd.map_oid(item['ne'], DD_TYPE_OWNER)
+                    if v is not None:
+                        owner_condition.append(FIELD_OWNER + '!="' + v + '"')
+        condition = condition + op.join(owner_condition)
+        return condition
+
+    def query(self, oid_only=True, **kwargs):
+        if (KEY_TAG in kwargs) and PV_SDU_QUERY.validate(KEY_TAG, kwargs[KEY_TAG]):
+            condition = BLANK
+            if (KEY_OWNER in kwargs) and PV_SDU_QUERY.validate(KEY_OWNER, kwargs[KEY_OWNER]):
+                condition = self._query_condition_for_owner(**kwargs)
+            if BLANK == condition:
+                condition = None
+            df = self._db.query(self._table_name, None, condition)
+            if df.empty:
                 return None
+            else:
+                res = pd.DataFrame()
+                res[FIELD_OWNER] = df[FIELD_OWNER]
+                try:
+                    if KEY_DATA in kwargs[KEY_TAG]:
+                        for tag, value in kwargs[KEY_TAG][KEY_DATA].items():
+                            for item in value:
+                                if 'eq' in item:
+                                    res[tag + '_eq' + str(item['eq'])] = df[tag].apply(
+                                        lambda x: (x & item['eq']) == item['eq'])
+                                if 'ne' in item:
+                                    res[tag + '_ne' + str(item['ne'])] = df[tag].apply(
+                                        lambda x: not ((x & item['ne']) == item['ne']))
+                    if KEY_DATA_DESC in kwargs[KEY_TAG]:
+                        for tag, value in kwargs[KEY_TAG][KEY_DATA_DESC].items():
+                            tag_id = self.tags.oid(tag)
+                            if tag_id is not None:
+                                for item in value:
+                                    if 'eq' in item:
+                                        tag_value = self.tags.enum_value(item['eq'])
+                                        if tag_value is not None:
+                                            res[tag + '_eq' + item['eq']] = df[tag_id].apply(
+                                                lambda x: (x & tag_value) == tag_value)
+                                    if 'ne' in item:
+                                        tag_value = self.tags.enum_value(item['ne'])
+                                        if tag_value is not None:
+                                            res[tag + '_ne' + item['ne']] = df[tag_id].apply(
+                                                lambda x: not ((x & tag_value) == tag_value))
+                except KeyError:
+                    return None
+                res.set_index(FIELD_OWNER, drop=True, inplace=True)
+                r = []
+                idx = None
+                if 'and' == kwargs[KEY_TAG][KEY_OP]:
+                    idx = res.index[res.all(axis=1)]
+                    r = idx.tolist()
+                if 'or' == kwargs[KEY_TAG][KEY_OP]:
+                    idx = res.index[res.any(axis=1)]
+                    r = idx.tolist()
+                if len(r) > 0:
+                    r.sort()
+                    if oid_only:
+                        return r
+                    else:
+                        df.set_index(FIELD_OWNER, inplace=True)
+                        return df.loc[idx].reset_index(level=0)
+                else:
+                    return None
+        else:
+            if (KEY_OWNER in kwargs) and PV_SDU_QUERY.validate(KEY_OWNER, kwargs[KEY_OWNER]):
+                condition = self._query_condition_for_owner(**kwargs)
+                df = self._db.query(self._table_name, None, condition)
+                if df.empty:
+                    return None
+                else:
+                    if oid_only:
+                        res = df[FIELD_OWNER].tolist()
+                        res.sort()
+                        return res
+                    else:
+                        return df
+            else:
+                raise ValueError(logger.error([2500]))
+
+    def _add_pre(self, data_ori: dict, **kwargs):
+        data = data_ori.copy()
+        if (KEY_DATA in kwargs) and PV_SDU_ADD.validate(KEY_DATA, kwargs[KEY_DATA]):
+            for tag in kwargs[KEY_DATA]:
+                if tag in data:
+                    data[tag] = data[tag] | kwargs[KEY_DATA][tag]
+        if (KEY_DATA_DESC in kwargs) and PV_SDU_ADD.validate(KEY_DATA_DESC, kwargs[KEY_DATA_DESC]):
+            for tag_desc in kwargs[KEY_DATA_DESC]:
+                tag = self.tags.oid(tag_desc)
+                if (tag is not None) and (tag in data):
+                    tag_value = self.tags.enum_value(kwargs[KEY_DATA_DESC][tag_desc])
+                    if tag_value is not None:
+                        data[tag] = data[tag] | tag_value
+        return data
 
     def add(self, **kwargs):
-        # TODO 待实现
-        if PV_SDU_ADD.validates(kwargs):
-            data = {KEY_OWNER: kwargs[KEY_OWNER]}
-            for tag in self.tags.value:
-                if tag in kwargs['data']:
-                    data[tag] = kwargs['data'][tag]
+        if (KEY_OWNER in kwargs) and PV_SDU_ADD.validate(KEY_OWNER, kwargs[KEY_OWNER]):
+            res = self.query(oid_only=False, owner={'op': 'and', 'data': [{'eq': kwargs[KEY_OWNER]}]})
+            if (res is not None) and (res.shape[0] == 1):
+                data = self._add_pre(res.to_dict('records')[0], **kwargs)
+                self._db.remove(self._table_name, FIELD_OWNER + '="' + kwargs[KEY_OWNER] + '"')
+                self._db.add(data, self._table_name)
+            else:
+                dd = DataDictionary(self.sid)
+                tmp = dd.query(oid_only=True, oid=kwargs[KEY_OWNER], dd_type=DD_TYPE_OWNER)
+                if len(tmp) == 1:
+                    data = {FIELD_OWNER: kwargs[KEY_OWNER]}
+                    for tag in self.tags.value:
+                        data[tag] = 0
+                    data = self._add_pre(data, **kwargs)
+                    self._db.add(data, self._table_name)
                 else:
-                    data[tag] = 0
-            self._db.add(data, self._table_name)
+                    raise ValueError(logger.error([2502, kwargs[KEY_OWNER]]))
         else:
             raise ValueError(logger.error([2501]))
 
