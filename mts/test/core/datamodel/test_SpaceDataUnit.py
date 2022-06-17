@@ -275,6 +275,65 @@ class MyTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             sdu.add(owner='菠萝', data_desc={'颜色': '红'})
 
+    def test_remove_01(self):
+        service_id = '51'
+        sdu = SpaceDataUnit(service_id)
+        dd = DataDictionary(service_id)
+        filename = os.path.join(cwd, 'resources', 'ds', '51.sdu')
+        sdu.sync_db(filename, True)
+        res = sdu.query(tag={'op': 'and', 'data': {'a4059507fd30c005': [{'eq': 1}]}})
+        self.assertEqual(2, len(res))
+        self.assertEqual('苹果', dd.map_desc(res[0], DD_TYPE_OWNER))
+        self.assertEqual('香蕉', dd.map_desc(res[1], DD_TYPE_OWNER))
+        sdu.remove(owner='a4059507fd2fc000', data={'a4059507fd30c005': 1})
+        res = sdu.query(tag={'op': 'and', 'data': {'a4059507fd30c005': [{'eq': 1}]}})
+        self.assertEqual(1, len(res))
+        self.assertEqual('香蕉', dd.map_desc(res[0], DD_TYPE_OWNER))
+
+    def test_remove_02(self):
+        service_id = '51'
+        sdu = SpaceDataUnit(service_id)
+        dd = DataDictionary(service_id)
+        filename = os.path.join(cwd, 'resources', 'ds', '51.sdu')
+        sdu.sync_db(filename, True)
+        res = sdu.query(tag={'op': 'and', 'data': {'a4059507fd30c005': [{'eq': 1}]}})
+        self.assertEqual(2, len(res))
+        self.assertEqual('苹果', dd.map_desc(res[0], DD_TYPE_OWNER))
+        self.assertEqual('香蕉', dd.map_desc(res[1], DD_TYPE_OWNER))
+        sdu.remove(owner='苹果', data_desc={'颜色': '红'})
+        res = sdu.query(tag={'op': 'and', 'data': {'a4059507fd30c005': [{'eq': 1}]}})
+        self.assertEqual(1, len(res))
+        self.assertEqual('香蕉', dd.map_desc(res[0], DD_TYPE_OWNER))
+
+    def test_remove_03(self):
+        service_id = '51'
+        sdu = SpaceDataUnit(service_id)
+        with self.assertRaises(ValueError):
+            sdu.remove(owner='a4059507fd2fc011', data_desc={'颜色': '红'})
+
+    def test_remove_04(self):
+        service_id = '51'
+        sdu = SpaceDataUnit(service_id)
+        with self.assertRaises(ValueError):
+            sdu.remove(data_desc={'颜色': '红'})
+
+    def test_remove_05(self):
+        service_id = '51'
+        sdu = SpaceDataUnit(service_id)
+        with self.assertRaises(ValueError):
+            sdu.remove(owner='菠萝', data_desc={'颜色': '红'})
+
+    def test_remove_06(self):
+        service_id = '51'
+        sdu = SpaceDataUnit(service_id)
+        db = DBHandler()
+        sdu.init_db()
+        res = sdu.query(tag={'op': 'and', 'data': {'a4059507fd30c005': [{'eq': 32}]}})
+        self.assertEqual(None, res)
+        sdu.remove(owner='苹果', data_desc={'颜色': '红'})
+        res = db.query(sdu._table_name)
+        self.assertEqual((1,3), res.shape)
+
 
 if __name__ == '__main__':
     unittest.main()  # pragma: no cover

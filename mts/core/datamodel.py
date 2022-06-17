@@ -574,7 +574,43 @@ class SpaceDataUnit(DataUnit):
         else:
             raise ValueError(logger.error([2501]))
 
+    def _remove_pre(self, data_ori: dict, **kwargs):
+        data = data_ori.copy()
+        if (KEY_DATA in kwargs) and PV_SDU_REMOVE.validate(KEY_DATA, kwargs[KEY_DATA]):
+            for tag in kwargs[KEY_DATA]:
+                if tag in data:
+                    data[tag] = data[tag] & (~ kwargs[KEY_DATA][tag])
+        if (KEY_DATA_DESC in kwargs) and PV_SDU_REMOVE.validate(KEY_DATA_DESC, kwargs[KEY_DATA_DESC]):
+            for tag_desc in kwargs[KEY_DATA_DESC]:
+                tag = self.tags.oid(tag_desc)
+                if (tag is not None) and (tag in data):
+                    tag_value = self.tags.enum_value(kwargs[KEY_DATA_DESC][tag_desc])
+                    if tag_value is not None:
+                        data[tag] = data[tag] & (~ tag_value)
+        return data
+
     def remove(self, **kwargs):
-        # TODO 待实现
-        pass
+        if (KEY_OWNER in kwargs) and PV_SDU_REMOVE.validate(KEY_OWNER, kwargs[KEY_OWNER]):
+            dd = DataDictionary(self.sid)
+            if PV_ID.validate(KEY_OID, kwargs[KEY_OWNER]):
+                if dd.map_desc(kwargs[KEY_OWNER], DD_TYPE_OWNER) is None:
+                    raise ValueError(logger.error([2503, kwargs[KEY_OWNER]]))
+                else:
+                    owner = kwargs[KEY_OWNER]
+            else:
+                owner = dd.map_oid(kwargs[KEY_OWNER], DD_TYPE_OWNER)
+            if owner is None:
+                raise ValueError(logger.error([2503, kwargs[KEY_OWNER]]))
+            res = self.query(oid_only=False, owner={'op': 'and', 'data': [{'eq': owner}]})
+            if (res is not None) and (res.shape[0] == 1):
+                data = self._remove_pre(res.to_dict('records')[0], **kwargs)
+                self._db.remove(self._table_name, FIELD_OWNER + '="' + owner + '"')
+                self._db.add(data, self._table_name)
+            else:
+                data = {FIELD_OWNER: owner}
+                for tag in self.tags.value:
+                    data[tag] = 0
+                self._db.add(data, self._table_name)
+        else:
+            raise ValueError(logger.error([2504]))
 

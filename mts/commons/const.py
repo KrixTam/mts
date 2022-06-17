@@ -95,6 +95,11 @@ DDID = {
     'pattern': '^[a-f0-9]{17}'
 }
 
+SERVICE_ID = {
+    'type': 'string',
+    'pattern': '[0-7]{2}'
+}
+
 DESC = {
     'type': 'string',
     'maxLength': 160
@@ -112,7 +117,8 @@ DD_TYPE = {
 
 PV_ID = ParameterValidator({
     KEY_OID: OID,
-    KEY_DDID: DDID
+    KEY_DDID: DDID,
+    KEY_SERVICE_ID: SERVICE_ID
 })
 
 SERVICE_CODE_MIN = int('101000', 2)
@@ -120,11 +126,6 @@ SERVICE_CODE_MAX = int('111111', 2)
 
 MASK_DEFAULT = '0000000000000000'
 MASK_ENUM = 'ffffffffffffffff'
-
-SERVICE_ID = {
-    'type': 'string',
-    'pattern': '[0-7]{2}'
-}
 
 PV_SERVICE = ParameterValidator({
     KEY_SERVICE_CODE: {
@@ -345,7 +346,7 @@ PV_SDU_ADD = ParameterValidator({
 })
 
 PV_SDU_REMOVE = ParameterValidator({
-    KEY_OWNER: OID,
+    KEY_OWNER: {'type': 'string'},
     KEY_DATA: {
         'type': 'object',
         'propertyNames': OID,
